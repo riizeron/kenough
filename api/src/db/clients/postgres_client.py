@@ -4,6 +4,7 @@ from sqlalchemy import select
 
 from src.utils.retry import retry
 
+from service_schemas.client import Client
 from service_schemas.task_sast import TaskSAST
 
 
@@ -17,6 +18,7 @@ class PostgresClient(DBClient):
         async with self.connector.get_session() as session:
             task = await session.execute(select(TaskSAST).where(
                 TaskSAST.taskId == task_id,
+                            TaskSAST.client == client_id
             ))
 
         first = task.first()
@@ -54,4 +56,25 @@ class PostgresClient(DBClient):
             session.add(task)
             await session.commit()
 
+    @retry(max_retries=5, timeout=0.01)
+    async def get_client(self, cn: str) -> Client:
+        """"""
 
+        async with self.connector.get_session() as session:
+            client = await session.execute(
+                select(Client).where(Client.subject_name == cn)
+            )
+        first = client.first()
+        return first[0] if first else None
+
+    @retry(max_retries=5, timeout=0.01)
+    async def create_client(self, cn: str) -> Client:
+        """"""
+
+        client = Client(subject_name=cn)
+
+        async with self.connector.get_session() as session:
+            session.add(client)
+            await session.commit()
+
+        return client

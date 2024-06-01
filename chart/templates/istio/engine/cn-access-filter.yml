@@ -1,0 +1,86 @@
+{{- $namespace := .Values.namespace }}
+{{ if eq .Release.Namespace $namespace }}
+
+{{- $serv := "api" -}}
+{{- $istiocomp := "ingressgateway" -}}
+
+#блокировка всего входящего трафика
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: deny-default
+spec:
+  configPatches:
+  - applyTo: HTTP_FILTER
+    match:
+      context: GATEWAY
+      listener:
+        filterChain:
+          filter:
+            name: envoy.filters.network.http_connection_manager
+        portNumber: {{ index .Values $serv "port" }}
+    patch:
+      operation: INSERT_BEFORE
+      value:
+        name: envoy.filters.http.rbac
+        typedConfig:
+          '@type': type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBAC
+        config: 
+          rules:
+            action: DENY
+            policies:
+              base-deny:
+                permissions:
+                - any: true
+                principals:
+                - any: true
+  workloadSelector:
+    labels:
+      istio: {{ $istiocomp }}-{{ $namespace }}
+
+
+{{- range $_, $route := index .Values $serv "routes" }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: access-{{ $route.name }}
+spec:
+  configPatches:
+  - applyTo: HTTP_ROUTE
+    match:
+      routeConfiguration:
+        vhost:
+          route:
+            name: {{ $route.name }}
+    patch:
+      operation: MERGE
+      value:
+        typed_per_filter_config:
+          envoy.filters.http.rbac:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.rbac.v3.RBACPerRoute
+            rbac:
+              rules:
+                action: ALLOW
+                policies:
+                  headers-policy:
+                    permissions:
+                    - any: true
+                    principals:
+                    - authenticated:
+                        principal_name:
+                          safe_regex:
+                              google_re2:
+                                max_program_size: 10000
+                              regex: >-
+                                {{ range $_, $cn := $route.cn }}.*CN={{ $cn }}.*|{{ end }}
+  workloadSelector:
+    labels:
+      istio: {{ $istiocomp }}-{{ $namespace }}
+
+      
+
+{{- end }}
+
+
+{{- end }}

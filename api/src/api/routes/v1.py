@@ -57,8 +57,16 @@ async def sast_launch(
         repo_model: RepoValidated,
         launch_service: launch_source_service_dependencies,
         repository: repository_dependencies,
+        x_ssl_client_certificate: Optional[str] = Header(None),
 ):
     """"""
+
+    if not x_ssl_client_certificate:
+        x_ssl_client_certificate = "-"
+
+    client = await repository.get_client(x_ssl_client_certificate)
+    if not client:
+        client = await repository.create_client(x_ssl_client_certificate)
 
     repo = Repo(url=str(repo_model.url), ref=repo_model.ref)
 
@@ -70,7 +78,7 @@ async def sast_launch(
 
     logger.info(f"{task} | LAUNCHED. Details: {task.dump()}")
 
-    await repository.create_task(task_id)
+    await repository.create_task(task_id, client.client)
 
     return JSONResponse(status_code=201, content=jsonable_encoder({"taskId": task_id}))
 
@@ -79,9 +87,18 @@ async def sast_launch(
 async def get_report(
         task_id: str,
         repository: repository_dependencies,
+        x_ssl_client_certificate: Optional[str] = Header(None),
 ):
-    
-    task = await repository.get_task(task_id)
+    if not x_ssl_client_certificate:
+        x_ssl_client_certificate = "-"
+
+    client = await repository.get_client(x_ssl_client_certificate)
+    if not client:
+        client = await repository.create_client(x_ssl_client_certificate)
+
+    print(client)
+
+    task = await repository.get_task(task_id, client_id=client.client)
     if not task:
         return JSONResponse(
             status_code=404, content=jsonable_encoder({"status": "NotFound", "report": ""})

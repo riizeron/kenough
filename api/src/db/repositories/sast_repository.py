@@ -1,5 +1,6 @@
 from src.db.abc.repository import Repository
 
+from service_schemas.client import Client
 from service_schemas.task_sast import TaskSAST
 
 from typing import NoReturn
@@ -25,3 +26,13 @@ class SASTRepository(Repository):
         """"""
 
         await self.db_client.send_report(report, task)
+
+    async def get_client(self, cn: str) -> Client:
+        """"""
+
+        return await self.db_client.get_client(cn)
+
+    async def create_client(self, cn: str) -> Client:
+        """"""
+
+        return await self.db_client.create_client(cn)
