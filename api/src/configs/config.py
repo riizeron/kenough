@@ -20,3 +20,4 @@ bb_creds = config["secrets"]["bb-http"]
 
 reader = ReadData(config=config)
 postgres_config = reader.get_postgres_config()
+kafka_config = reader.get_kafka_config()

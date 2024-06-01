@@ -1,4 +1,5 @@
 from src.configs.postgres_config import PostgresConfig
+from src.configs.kafka_config import KafkaConfig
 from src.configs.tool_config import ToolConfig
 
 from src.utils.wait import wait_secret
@@ -29,6 +30,17 @@ class ReadData:
 
         return PostgresConfig(db_user, db_password, db_host, db_port, db_database)
 
+    def get_kafka_config(self) -> KafkaConfig:
+        """Read kafka config"""
+
+        config_kafka_producer = self.config["kafka"]["producer"]
+
+        return KafkaConfig(
+            bootstrap_servers=config_kafka_producer["bootstrap_servers"],
+            client_id=config_kafka_producer["client_id"],
+            topic=config_kafka_producer["topic"],
+            retries=config_kafka_producer["retries"]
+        )
 
     def get_semgrep_config(self) -> ToolConfig:
         return ToolConfig(

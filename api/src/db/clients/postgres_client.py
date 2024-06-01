@@ -11,7 +11,7 @@ class PostgresClient(DBClient):
     """"""
 
     @retry(max_retries=5, timeout=0.01)
-    async def get_task(self, task_id: str, client_id: int) -> TaskSAST:
+    async def get_task(self, task_id: str) -> TaskSAST:
         """"""
 
         async with self.connector.get_session() as session:
@@ -24,10 +24,10 @@ class PostgresClient(DBClient):
         return first[0] if first else None
 
     @retry(max_retries=5, timeout=0.01)
-    async def create_task(self, task_id: str, client_id: int) -> TaskSAST:
+    async def create_task(self, task_id: str) -> TaskSAST:
         """"""
 
-        task = TaskSAST(client=client_id, taskId=task_id, status=1)
+        task = TaskSAST(taskId=task_id, status=1)
 
         async with self.connector.get_session() as session:
             session.add(task)
@@ -53,5 +53,3 @@ class PostgresClient(DBClient):
             task.result = report
             session.add(task)
             await session.commit()
-
-

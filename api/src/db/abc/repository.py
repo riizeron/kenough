@@ -27,4 +27,3 @@ class Repository(ABC):
 
     async def send_report(self, report: dict, task: TaskSAST) -> NoReturn:
         """"""
-

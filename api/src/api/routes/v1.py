@@ -21,6 +21,8 @@ from src.git.git_http import GitHttpClient
 from src.db import sast_repository as sast_repository_dependencies
 from src.db.abc.repository import Repository
 from src.git import git_http_client
+from src.kafka import kafka_producer as kafka_producer_dependencies
+from src.kafka.kafka_abc import KafkaProducerABC
 
 logger = logging.getLogger(__name__)
 
@@ -40,15 +42,21 @@ class TaskStatus(Enum):
 def get_git_http_client() -> GitHttpClient:
     return git_http_client
 
+
+def get_kafka_producer() -> KafkaProducerABC:
+    return kafka_producer_dependencies
+
+
 def get_repository() -> Repository:
     return sast_repository_dependencies
 
 
 def get_launch_source_service() -> LaunchSourceService:
-    return LaunchSourceService(scm=get_git_http_client())
+    return LaunchSourceService(producer=get_kafka_producer(), scm=get_git_http_client())
 
 
 repository_dependencies = Annotated[Repository, Depends(get_repository)]
+kafka_dependencies = Annotated[KafkaProducerABC, Depends(get_kafka_producer)]
 launch_source_service_dependencies = Annotated[LaunchSourceService, Depends(get_launch_source_service)]
 
 
@@ -80,7 +88,7 @@ async def get_report(
         task_id: str,
         repository: repository_dependencies,
 ):
-    
+
     task = await repository.get_task(task_id)
     if not task:
         return JSONResponse(
