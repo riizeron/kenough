@@ -1,0 +1,10 @@
+{
+  "key": "094fd3b0-1615-45fb-9713-d91999b97a6e",
+  "value": {
+    "url": "ssh://git@stash.sigma.sbrf.ru:7999/orch/repo_analyzer.git",
+    "ref": "master",
+    "languages": [
+      "YAML"
+    ]
+  }
+}

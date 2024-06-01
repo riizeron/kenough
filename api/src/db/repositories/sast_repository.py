@@ -6,15 +6,15 @@ from typing import NoReturn
 
 
 class SASTRepository(Repository):
-    async def get_task(self, task_id: str, client_id: int) -> TaskSAST:
+    async def get_task(self, task_id: str) -> TaskSAST:
         """"""
 
-        return await self.db_client.get_task(task_id, client_id)
+        return await self.db_client.get_task(task_id)
 
-    async def create_task(self, task_id: str, client_id: int) -> NoReturn:
+    async def create_task(self, task_id: str) -> NoReturn:
         """"""
 
-        return await self.db_client.create_task(task_id, client_id)
+        return await self.db_client.create_task(task_id)
 
     async def update_status(self, status: int, task: TaskSAST) -> NoReturn:
         """"""
