@@ -1,0 +1,91 @@
+
+{{- $namespace := .Release.Namespace }}
+
+{{- $serv := "prometheus" -}}
+
+---
+# Source: suppd-backend/templates/deployments/prometheus-deployment.yaml
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: prometheus-{{ $namespace }}
+  namespace: {{ $namespace }}
+  labels:
+    app: prometheus-{{ $namespace }}
+    istio: prometheus-{{ $namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus-{{ $namespace }}
+      istio: prometheus-{{ $namespace }}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: prometheus-{{ $namespace }}
+        chart: gateways
+        heritage: Tiller
+        istio: prometheus-{{ $namespace }}
+        release: istio
+        secman-injector: enabled
+      annotations:
+        sidecar.istio.io/inject: 'true'
+        vault.hashicorp.com/agent-pre-populate: "false"
+        sidecar.istio.io/proxyCPU: {{ .Values.istio.resources.cpu }}m
+        sidecar.istio.io/proxyCPULimit: {{ .Values.istio.resources.cpu }}m
+        sidecar.istio.io/proxyMemory: {{ .Values.istio.resources.memory }}Mi
+        sidecar.istio.io/proxyMemoryLimit: {{ .Values.istio.resources.memory }}Mi
+        proxy.istio.io/config: |
+          holdApplicationUntilProxyStarts: true
+        checksum/config: {{ include "orch.checksum/config" . }}
+    spec:
+      restartPolicy: Always
+    #   serviceAccountName: prometheus
+      imagePullSecrets: {{ .Values.imagePullSecrets | toYaml | nindent 8 }}
+      schedulerName: default-scheduler
+      terminationGracePeriodSeconds: 60
+      securityContext: {}
+      containers:
+        - terminationMessagePath: /dev/termination-log
+          name: prometheus
+          securityContext:
+            readOnlyRootFilesystem: true
+          ports:
+            - containerPort: 9090
+              protocol: TCP
+          imagePullPolicy: Always
+          volumeMounts:
+            - name: prometheus-1
+              mountPath: /prometheus
+            - name: volume-k5dem
+              mountPath: /etc/prometheus
+          terminationMessagePolicy: File
+          image: registry.sigma.sbrf.ru/base/redhat/openshift4/ose-prometheus@sha256:6abde7f743048a2fee074372b103c68aff3a6c7c8c1fd0945a807bf020613ac2
+          args:
+            - '--web.console.templates=/etc/prometheus/consoles'
+            - '--web.console.libraries=/etc/prometheus/console_libraries'
+            - '--config.file=/etc/prometheus/prometheus.yml'
+            - '--storage.tsdb.path=/prometheus'
+            - '--storage.tsdb.retention=2h'
+            - '--web.enable-lifecycle'
+            - '--storage.tsdb.wal-compression'
+
+          {{- include "orch.resources" (merge (dict "Serv" $serv) .) | nindent 10 }}
+
+      serviceAccount: {{ index .Values $serv "serviceAccountName" }}
+      volumes:
+        - name: prometheus-1
+          emptyDir: {}
+        - name: volume-k5dem
+          configMap:
+            name: prometheus-config
+            defaultMode: 256
+      dnsPolicy: ClusterFirst
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600

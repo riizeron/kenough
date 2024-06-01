@@ -1,0 +1,25 @@
+{{- $serv := "gitleaks" }}
+# required
+scanner:
+  name: gitleaks
+  practice: secret
+  src: {{ .Values.src }}
+  path: {{ .Values.gitleaks.path }}
+  
+wait_flag: {{ index .Values "source-checkout" "flag" }}
+
+report:
+  extension: {{ .Values.gitleaks.extension }}
+  dir: {{ .Values.results }}
+
+errpath: {{ .Values.errors }}
+logpath: {{ .Values.logs }}
+
+args: 
+  - -f
+  - json
+  - --exit-code
+  - '0'
+  - --no-git
+
+timeout: 900

@@ -1,0 +1,27 @@
+
+{{- $namespace := .Values.namespace }}
+{{ if eq .Release.Namespace $namespace }}
+
+{{- $istiocomp := "egressgateway" -}}
+{{- $serv := "repo-analyzer" -}}
+
+---
+# Source: orch/templates/runner-checker.yml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ $serv }}
+  namespace: {{ $namespace }}
+spec:
+  hosts:
+    - orch-{{ $serv }}-s
+  exportTo:
+    - "."
+  tcp:
+    - route:
+        - destination:
+            host: orch-{{ $serv }}-s
+            port:
+              number: {{ index .Values $serv "port"}}
+
+{{- end }}

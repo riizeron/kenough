@@ -1,0 +1,119 @@
+{{- $serv := "sberworks" -}}
+
+
+[SERVICE]
+    Parsers_File    /fluent-bit/etc/parsers.conf
+
+[INPUT]
+    Name              tail
+    Path              /logs/source-checkout.log
+    Tag               source-checkout
+    read_from_head   true
+    multiline.parser python, python-multiline-regex
+
+[INPUT]
+    Name              tail
+    Path              /logs/sbom-receiver.log
+    Tag               sbom-receiver
+    read_from_head   true
+    multiline.parser python, python-multiline-regex
+
+
+[INPUT]
+    Name              tail
+    Path              /logs/sender.log
+    Tag               sender
+    read_from_head   true
+    multiline.parser python, python-multiline-regex
+
+[INPUT]
+    Name              tail
+    Path              /logs/sbersca.log
+    Tag               sbersca
+    read_from_head   true
+    multiline.parser python, python-multiline-regex
+
+[INPUT]
+    Name              tail
+    Path              /logs/checkmarx-client.log
+    Tag               checkmarx
+    read_from_head   true
+    multiline.parser python, python-multiline-regex
+
+[INPUT]
+    Name              tail
+    Path              /logs/gitleaks.log
+    Tag               gitleaks
+    read_from_head   true
+    multiline.parser python, python-multiline-regex
+
+[INPUT]
+    Name              tail
+    Path              /logs/semgrep.log
+    Tag               semgrep
+    read_from_head   true
+    multiline.parser python, python-multiline-regex
+    
+[INPUT]
+    Name              tail
+    Path              /logs/deepsecrets.log
+    Tag               deepsecrets
+    read_from_head   true
+    multiline.parser python, python-multiline-regex
+
+[INPUT]
+    Name              tail
+    Path              /logs/codeql.log
+    Tag               codeql
+    read_from_head   true
+    multiline.parser python, python-multiline-regex
+
+[INPUT]
+    Name              tail
+    Path              /logs/distrib-receiver.log
+    Tag               distrib-receiver
+    read_from_head   true
+    multiline.parser python, python-multiline-regex
+
+[INPUT]
+    Name              tail
+    Path              /logs/odc.log
+    Tag               odc
+    read_from_head   true
+    multiline.parser python, python-multiline-regex  
+
+[INPUT]
+    Name              tail
+    Path              /logs/stingray-client.log
+    Tag               stingray
+    read_from_head   true
+    multiline.parser python, python-multiline-regex   
+
+[FILTER]
+    Name          rewrite_tag
+    Match         scan
+    Rule          $log ^.*INFO.*$ scan.info false
+
+[FILTER]
+    Name          rewrite_tag
+    Match         scan
+    Rule          $log ^.*ERROR.*$ scan.error false
+
+[FILTER]
+    Name          rewrite_tag
+    Match         scan
+    Rule          $log ^.*WARNING.*$ scan.warn false
+
+
+
+[FILTER]
+    Name parser
+    Match scan.*
+    Key_Name log
+    Parser scan-message
+
+
+[OUTPUT]
+    Name          stdout
+    Match         *  
+    Format        json_lines

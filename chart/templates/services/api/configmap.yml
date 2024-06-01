@@ -1,0 +1,27 @@
+
+{{- $namespace := .Values.namespace -}}
+{{ if eq .Release.Namespace $namespace }}
+
+{{- $serv := "api" -}}
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ index .Values $serv "name" }}-cm
+  namespace: {{ $namespace }}
+data:
+  config.yml: |-
+    {{ (tpl (.Files.Get "files/services/api/config.yml") . ) | nindent 4 }}
+
+  info.json: |-
+    {{ (tpl (.Files.Get "files/services/api/info.json") . ) | nindent 4 }}
+
+  tools.yml: |-
+    {{ (tpl (.Files.Get "files/services/api/tools.yml") . ) | nindent 4 }}
+
+  langs.yml: |-
+    {{ (tpl (.Files.Get "files/services/api/langs.yml") . ) | nindent 4 }}
+    
+  scm_repos.yml: |-
+    {{ .Files.Get "files/services/api/scm_repos.yml" | nindent 4 }} 
+     
+{{- end }}

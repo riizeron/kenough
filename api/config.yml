@@ -1,0 +1,27 @@
+
+logpath: ./logs
+
+app:
+  port: 5020
+
+tmp: ./tmp
+
+prefixes_to_remove: ["tmp"]
+
+max_unpacked_size: 300
+
+db:
+  host: "10.56.110.14"
+  port: "6544"
+  database: "orch"
+
+secrets:
+  postgres:
+    username-admin: secrets/postgres-username-admin
+    password-admin: secrets/postgres-password-admin
+
+  bb-http:
+    username-stash.sigma: secrets/bb-http-username-stash.sigma
+    token-stash.sigma: secrets/bb-http-token-stash.sigma
+    username-stash.delta: secrets/bb-http-username-stash.delta
+    token-stash.delta: secrets/bb-http-token-stash.delta

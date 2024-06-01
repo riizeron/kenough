@@ -1,0 +1,507 @@
+
+# app params
+src: /tmp/src
+zip: /tmp/zip/source.zip
+results: /tmp/results
+artifacts: /tmp/artifacts
+errors: /tmp/errors
+logs: /tmp/logs
+tmp: /tmp/tmp
+
+sbom_name: SBOM.json
+deptree_name: DEPTREE.txt
+
+
+prodRegistry: registry.sigma.sbrf.ru/ci05083258/ci05083258
+devRegistry: docker-internal.registry-ci.delta.sbrf.ru/ci05083258/ci05083258
+
+imagePullSecrets: 
+  - name: registry-ci.delta.sbrf.ru
+  - name: registry.sigma.sbrf.ru
+  - name: docker-dev.registry-ci.delta.sbrf.ru
+
+namespace: ci01544525-edevgen2d-dso-engine
+job_namespace: ci01544525-edevgen2d-dso-scan
+
+client_cn: CI05083258_DEV_orch
+
+# dependencies 
+istio_enabled: true
+vault_enabled: true
+fluentbit_enabled: true
+prometheus_enabled: true
+
+role_create: true
+
+probes_enabled: true
+
+
+control_panel: ci03189811-edevgen2d-synapse-control-panel-sbt
+istioImage: registry.sigma.sbrf.ru/ci03745765/ci03745765/polm/proxyv2@sha256:e3aaca05bb90a1b8949888b60f6e9bd6caac12b5ff715628235cf2e051c43db2
+ingress_host: apps.dev-gen2.delta.sbrf.ru
+
+mount_mode: 0400
+
+restartPolicy: Always
+imagePullPolicy: Always
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 25%
+    maxSurge: 25%
+  revisionHistoryLimit: 10
+  progressDeadlineSeconds: 600
+service:
+  protocol: TCP
+ingressClassName: nginx
+
+livenessProbe:
+  failureThreshold: 5 #количество неудачных проверок
+  initialDelaySeconds: 120 #задержка до проверок
+  periodSeconds: 60 #интервал между проверками
+#если не пройдёт проверки - перезапуск
+
+readinessProbe:
+  failureThreshold: 5
+  initialDelaySeconds: 120
+  periodSeconds: 60
+#если не пройдёт проверки - удаление из балансировки
+
+startupProbe:
+  failureThreshold: 6
+  initialDelaySeconds: 30
+  periodSeconds: 5
+#если не пройдёт проверки - пометка как неисправный
+
+terminationGracePeriodSeconds: 60
+ 
+istio:
+  tlsMode: ISTIO_MUTUAL
+  resources:
+    cpu: 100
+    memory: 100
+
+resource_ratio: 1
+
+vault:
+  namespace: CI02641928_CI05121455
+  secret_path: A/ORCH/OSH/ALL/KV
+  
+  certs_path: SBERCA/sberca-test-ext-g2
+  email: SEsenbekov@sberbank.ru
+  format: pem
+
+  mount_path: /tmp/secrets
+  secrets:
+    egressgateway-certs:
+      concat_keys: 
+        - filename: ca_chain
+          values:
+            - root_cert
+            - issuing_ca
+      keys: 
+        - certificate
+        - private_key
+    sbom-ca-certs: 
+      mount_path: /tmp/secrets/sbom-ca-certs-host
+      keys:
+        - sbom-ca-chain.cert.pem
+    sbom-certs:
+      mount_path: /tmp/secrets/sbom-certs-host
+      keys: 
+        - sbom-tls.crt
+        - sbom-tls.key
+    federate_chain:
+      mount_path: /tmp/secrets
+      federate_keys:
+        - ca-chain.cert.pem
+    ingressgateway-certs:
+      concat_keys: 
+        - filename: ca_chain
+          values:
+            - root_cert
+            - issuing_ca
+      keys: 
+        - certificate
+        - private_key
+    bb-ssh:
+      keys: 
+        - key
+    bb-http:
+      keys:
+        - username-stage-stash.sigma
+        - token-stage-stash.sigma
+        - username-stash.sigma
+        - token-stash.sigma
+        - username-stash.delta
+        - token-stash.delta
+
+    distrib-nexus:
+      keys: 
+        - username-sigma
+        - password-sigma
+        - username-delta
+        - password-delta
+    osvdev:
+      keys: 
+        - username
+        - password
+    nvd:
+      keys: 
+        - username
+        - password
+    checkmarx: 
+      keys: 
+        - username
+        - password
+    stingray: 
+      keys: 
+        - username
+        - password
+    postgres:
+      keys:
+        - username-app
+        - username-admin
+        - password-app
+        - password-admin
+  resources:
+    cpu: 100
+    memory: 100
+
+
+# commit hash of the image source
+hash: 
+  checker: ''
+  repo-analyzer: ''
+  prometheus: ''
+
+  # scanners
+  semgrep: ''
+  gitleaks: ''
+  
+  # inits
+  source-checkout: ''
+
+# main tag
+tag:
+  api: main
+  repo-analyzer: main
+
+  # scanners
+  semgrep: main
+  gitleaks: main
+  
+  # inits
+  source-checkout: main
+
+
+# MAIN SERVICES
+api:
+  name: orch-api
+  replicas: 1
+  resources:
+    cpu: 200
+    memory: 800
+  port: 5000
+  protocol: HTTPS
+  tls_mode: MUTUAL
+  req_per_minute: 1000 
+  routes:
+    - name: docs
+      prefix: /api/docs
+      req_per_minute: 1000
+      cn: 
+        - orch-client
+        - CI04490594-DEV-jenkins  
+    - name: info
+      prefix: /api/v1/info
+      req_per_minute: 1000
+      cn: 
+        - orch-client
+    - name: v2-launch
+      prefix: /api/v2/launch
+      req_per_minute: 60
+      cn: 
+        - orch-client
+        - platform-service-client
+    - name: v3-sast
+      prefix: /api/v3/sast
+      req_per_minute: 60
+      cn: 
+        - orch-client
+        - CI04490594-DEV-jenkins
+    - name: v3-sca
+      prefix: /api/v3/sca
+      req_per_minute: 60
+      cn: 
+        - orch-client     
+    - name: v3-ss
+      prefix: /api/v3/ss
+      req_per_minute: 60
+      cn: 
+        - orch-client 
+        - CI04490594-DEV-jenkins  
+    - name: v3-dast
+      prefix: /api/v3/dast
+      req_per_minute: 60
+      cn: 
+        - orch-client 
+    - name: v3-mdast
+      prefix: /api/v3/mdast
+      req_per_minute: 60
+      cn: 
+        - orch-client
+    - name: v3-get-ss-report
+      prefix: /api/v3/get_ss_report
+      req_per_minute: 60
+      cn: 
+        - orch-client 
+        - CI04490594-DEV-jenkins  
+    - name: v3-get-raw-report
+      prefix: /api/v3/get_raw_report
+      req_per_minute: 60
+      cn: 
+        - orch-client 
+        - CI04490594-DEV-jenkins      
+    - name: serv-metrics
+      prefix: /serv/metrics
+      req_per_minute: 1000
+      cn: 
+        - orch-client   
+  serviceAccountCreate: false
+  serviceAccountName: default
+  livenessProbePath: /api/v1/openapi.json
+  readinessProbePath: /api/v1/openapi.json
+  secrets:
+    - bb-ssh
+    - bb-http
+    - distrib-nexus
+    - postgres
+
+# enrichment-hub:
+#   name: orch-enrichment-hub
+#   replicas: 0
+#   resources:
+#     cpu: 200
+#     memory: 600
+#   port: 5000
+#   serviceAccountCreate: false
+#   serviceAccountName: default
+
+repo-analyzer:
+  name: orch-repo-analyzer
+  replicas: 1
+  resources:
+    cpu: 800
+    memory: 1200
+  port: 50051
+  serviceAccountCreate: false
+  serviceAccountName: default
+  secrets:
+    - bb-ssh
+    - bb-http
+
+linguist-service:
+  name: orch-linguist-service
+  resources:
+    cpu: 400
+    memory: 2600
+  port: 50052
+  pool_size: 10
+
+
+
+fluentbit:
+  image: registry.sigma.sbrf.ru/ci02587203/ci02809205_tengri/fluent-bit@sha256:e38955b3495fe6a40b0506326c1d8458e2f03ad67747406af75f3719678b6036
+  resources:
+    cpu: 100
+    memory: 100
+    
+# INITS
+source-checkout:
+  flag: /tmp/flags/checkout
+  secrets:
+    - bb-ssh
+    - bb-http
+
+# SCANNERS
+semgrep:
+  report_ext: json
+  cmd: semgrep --json 
+
+gitleaks:
+  path: gitleaks
+  extension: json
+
+
+# INFRASTRUCTURE SERVICES
+k8sapi:
+  port: 443
+  hosts: 
+  - name: kubernetes.default.svc
+    ip: 
+      - '29.66.0.1'
+    port: 10000
+  protocol: TLS 
+  resolution: STATIC
+
+postgres:
+  db:
+    names:
+      main: "orch"
+
+  port: 6544
+  asyncport: 5433
+  hosts: 
+  - name: tkldd-orch00002.delta.sbrf.ru
+    ip: 
+      - '10.56.110.14'
+    port: 5050
+  protocol: TCP 
+  resolution: STATIC
+
+
+secman:
+  port: 443
+  hosts: 
+  - name: t.secrets.delta.sbrf.ru
+    ip: 
+      - '10.46.228.70'
+    port: 8550
+  protocol: TLS 
+  resolution: DNS
+
+
+
+
+# ARTIFACT SERVICES
+bb:
+  port: 7999
+  hosts:
+    - name: stash.sigma.sbrf.ru
+      ip: 
+        - '10.46.235.120'
+        - '10.46.225.110'
+      port: 20990
+      httpPort: 30990
+    - name: stage-stash.sigma.sbrf.ru
+      ip: 
+        - '10.53.94.103'
+        - '10.19.48.28'
+      port: 20991
+      httpPort: 30991
+    - name: tvlds-git000003.delta.sbrf.ru
+      ip: 
+        - '10.19.48.28'
+        - '10.116.82.32'
+      port: 20992
+      httpPort: 30992
+    - name: test-stash.delta.sbrf.ru
+      ip: 
+        - '10.19.48.28'
+        - '10.55.49.94'
+        - '10.36.118.189'
+      port: 20993
+      httpPort: 30993
+  protocol: TCP
+  resolution: DNS
+  
+
+# ISTIO GATEWAYSS
+ingressgateway:
+  serviceAccountName: default
+  resources:
+    cpu: 100
+    memory: 100
+  secrets:
+    - ingressgateway-ca-certs
+    - ingressgateway-certs
+
+egressgateway:
+  serviceAccountName: default
+  resources:
+    cpu: 100 
+    memory: 100 
+  secrets:
+    - egressgateway-ca-certs
+    - egressgateway-certs
+    - sbom-ca-certs
+    - sbom-certs
+    - federate_chain
+
+
+# MONITORING SERVICES
+prometheus:
+  intport: 10001
+  intprotocol: TCP
+  extport: 8443
+  extprotocol: HTTPS
+  port: 9090
+  protocol: TLS
+  serviceAccountName: prometheus
+  routes:
+    - name: root
+      prefix: /
+      cn: 
+        - CI03251948_CSMON_TEST_SIGMA_PROMETHEUS_CLISERV
+    - name: federate
+      prefix: /federate
+      cn: 
+        - CI03251948_CSMON_TEST_SIGMA_PROMETHEUS_CLISERV
+
+  scrapper:
+    port: 8081
+    protocol: HTTP
+    host: prometheus.pod.scrapper.host
+    tlsMode: ISTIO_MUTUAL
+
+  federate:
+    intport: 10001
+    extport: 9090
+    port: 9090
+    hosts:
+    - name: federate.openshift-monitoring.svc
+      port: 10001
+    protocol: TCP
+    host: federate.openshift-monitoring.svc
+    tlsMode: ISTIO_MUTUAL
+    resolution: DNS
+
+  csmon:
+    druleport: 8427
+    gatewayport: 1994
+    extport1: 8427
+    extport2: 8428
+    protocol: HTTP
+    extprotocol: HTTPS
+    host: tvlds-csmon0019.delta.sbrf.ru
+    sni: tvlds-csmon0019.delta.sbrf.ru
+    tlsMode: ISTIO_MUTUAL
+    resolution: DNS
+    hosts: 
+    - name: tvlds-csmon0019.delta.sbrf.ru
+      port: 1994    
+  remote_write:
+    url: http://tvlds-csmon0019.delta.sbrf.ru
+    port: 8428
+
+sberworks:
+  port: 9093
+  hosts:
+    - name: tkles-dpm000039.vm.esrt.cloud.sbrf.ru
+      ip: 
+        - '10.53.227.224'
+      port: 7779
+    - name: tkles-dpm000040.vm.esrt.cloud.sbrf.ru
+      ip: 
+        - '10.53.227.218'
+      port: 7778
+    - name: tkles-dpm000041.vm.esrt.cloud.sbrf.ru
+      ip: 
+        - '10.53.227.199'
+      port: 7777
+  protocol: TCP
+  resolution: DNS
+  fqdn: esb.ift.devopsaudit.sigma.sbrf.ru
+
+  

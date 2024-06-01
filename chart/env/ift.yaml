@@ -1,0 +1,109 @@
+
+namespace: ci05083258-orch-engine-sk
+job_namespace: ci05083258-orch-scan-sk
+
+prodRegistry: registry.sigma.sbrf.ru/ci05083258/ci05083258
+devRegistry: docker-internal.registry-ci.delta.sbrf.ru/ci05083258/ci05083258
+
+engineSA: default
+
+role_create: true
+
+control_panel: ci03189811-synapse-control-panel
+ingress_host: apps.ift-terra000023-eds.ocp.delta.sbrf.ru
+istioImage: registry.sigma.sbrf.ru/ci03745765/ci03745765/polm/proxyv2@sha256:e3aaca05bb90a1b8949888b60f6e9bd6caac12b5ff715628235cf2e051c43db2
+
+resource_ratio: 1
+
+client_cn: CI05083258_IFT_orch
+
+vault:
+  namespace: CI02641928_CI05122299
+  secret_path: A/ORCH/OSH/ALL/KV
+  
+  certs_path: SBERCA/sberca-test-ext-g2
+
+bb:
+  hosts:
+    - name: stage-stash.sigma.sbrf.ru
+      ip: 
+        - '10.53.94.103'
+        - '10.19.48.28'
+      port: 20991
+      httpPort: 30991
+      extport: 7999
+    - name: stash.sigma.sbrf.ru
+      ip: 
+        - '10.46.235.120'
+        - '10.46.225.110'
+      port: 20990
+      httpPort: 30990
+      extport: 7999
+    - name: stash.delta.sbrf.ru
+      ip: 
+        - '10.50.116.27'
+        - '10.58.131.8'
+      port: 20994
+      httpPort: 30994
+      extport: 7999
+    
+
+secman:
+  hosts: 
+  - name: t.secrets.delta.sbrf.ru
+    ip: 
+      - '10.46.228.70'
+    port: 8550
+
+k8sapi:
+  hosts: 
+  - name: kubernetes.default.svc
+    ip: 
+      - '29.66.0.1'
+    port: 10000
+
+prometheus:
+  csmon:
+    host: tvlds-csmon0015.delta.sbrf.ru
+    sni: tvlds-csmon0015.delta.sbrf.ru
+    hosts:
+    - name: tvlds-csmon0015.delta.sbrf.ru
+      port: 1994 
+  federate: 
+    ip: 29.66.199.94
+  remote_write:
+    url: http://tvlds-csmon0015.delta.sbrf.ru
+    port: 8428
+
+postgres:
+  db:
+    names:
+      main: "orch"
+
+  port: 6544
+  asyncport: 5433
+  hosts: 
+  - name: tkldd-orch00003.delta.sbrf.ru
+    ip: 
+      - '10.53.166.180'
+    port: 5050
+  protocol: TCP 
+  resolution: STATIC
+  
+sberworks:
+  port: 9093
+  hosts:
+    - name: tkles-dpm000039.vm.esrt.cloud.sbrf.ru
+      ip: 
+        - '10.53.227.224'
+      port: 7779
+    - name: tkles-dpm000040.vm.esrt.cloud.sbrf.ru
+      ip: 
+        - '10.53.227.218'
+      port: 7778
+    - name: tkles-dpm000041.vm.esrt.cloud.sbrf.ru
+      ip: 
+        - '10.53.227.199'
+      port: 7777
+  fqdn: esb.ift.devopsaudit.sigma.sbrf.ru
+  postfix: ift

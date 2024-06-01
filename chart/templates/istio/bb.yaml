@@ -1,0 +1,127 @@
+
+{{- $namespace := .Release.Namespace }}
+
+{{- $serv := "bb" -}}
+{{- $istiocomp := "egressgateway" -}}
+
+
+--- 
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: {{ $serv }}
+  namespace: {{ $namespace }}
+spec:
+  selector:
+    istio: {{ $istiocomp }}-{{ $namespace }}
+  servers:
+{{- range index .Values $serv "hosts" }}
+  - hosts:
+    - {{ .name }}
+    port:
+      name: {{ lower (index $.Values $serv "protocol") }}-{{ .port }}
+      number: {{ .port }}
+      protocol: {{ index $.Values $serv "protocol" }}
+  - hosts:
+    - {{ .name }}
+    port:
+      name: tcp-{{ .httpPort }}
+      number: {{ .httpPort }}
+      protocol: TCP
+{{- end }}
+
+
+{{- range index .Values $serv "hosts" }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:   
+  name: {{ $serv }}-{{ .name | replace "." "-" }}
+  namespace: {{ $namespace }}
+spec:
+  addresses: {{ .ip | toYaml | nindent 4}}
+  exportTo:
+    - .
+  hosts:
+    - {{ .name }}
+  location: MESH_EXTERNAL
+  ports:
+    - name: {{ lower (index $.Values $serv "protocol") }}-{{ .extport }}
+      number: {{ .extport }}
+      protocol: {{ index $.Values $serv "protocol" }}
+    - name: {{ lower (index $.Values $serv "protocol") }}-22
+      number: 22
+      protocol: {{ index $.Values $serv "protocol" }}
+    - name: tcp-443
+      number: 443
+      protocol: TCP
+    - name: tcp-80
+      number: 80
+      protocol: TCP
+  resolution: {{ index $.Values $serv "resolution" }}
+{{ end }}
+
+
+{{- range index .Values $serv "hosts" }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ $serv }}-{{ .name | replace "." "-" }}
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+  - .
+  gateways:
+  - {{ $serv }}
+  - mesh
+  hosts:
+  - {{ .name }}
+  tcp:
+  - match:  
+    - gateways:
+      - mesh
+      port: 22
+    - gateways:
+      - mesh
+      port: {{ .extport }}
+    route:
+    - destination:
+        host: {{ $istiocomp }}-svc
+        port:
+          number: {{ .port }}
+  - match:
+    - gateways:
+      - {{ $serv }}
+      port: {{ .port }}
+    route:
+    - destination:
+        host: {{ .name }}
+        port:
+          number: {{ .extport }}
+
+  - match:
+    - gateways:
+      - mesh
+      port: 443
+    - gateways:
+      - mesh
+      port: 80
+    route:
+    - destination:
+        host: {{ $istiocomp }}-svc
+        port:
+          number: {{ .httpPort }}
+  - match:
+    - gateways:
+      - {{ $serv }}
+      port: {{ .httpPort }}
+    route:
+    - destination:
+        host: {{ .name }}
+        port: 
+          number: 443
+
+{{ end }}
+
+

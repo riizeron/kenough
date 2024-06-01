@@ -1,0 +1,10 @@
+apiVersion: v1
+description: A Helm chart for orchestrator
+name: orch
+version: "0.0.0"
+
+appVersion: <branch>.<commit>
+
+annotations:
+  branch: "use-env-values"
+  commit: "test"

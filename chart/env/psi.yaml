@@ -1,0 +1,110 @@
+
+namespace: ci05083258-epsigen-orch-engine-sk
+job_namespace: ci05083258-epsigen-orch-scan-sk
+
+prodRegistry: registry.sigma.sbrf.ru/ci05083258/ci05083258
+
+engineSA: default
+
+role_create: false
+
+control_panel: ci03189811-epsigen-synapse-control-panel-sbt
+ingress_host: apps.psi-gen.sigma.sbrf.ru
+istioImage: registry.sigma.sbrf.ru/ci03745765/ci03745765/polm/proxyv2@sha256:e3aaca05bb90a1b8949888b60f6e9bd6caac12b5ff715628235cf2e051c43db2
+
+
+resource_ratio: 1
+client_cn: CI05083258_PSI_orch
+
+
+vault:
+  namespace: CI02641928_CI05121458
+  secret_path: A/ORCH/OSH/ALL/KV
+
+bb:
+  hosts:
+    - name: stash.sigma.sbrf.ru
+        ip: 
+          - '10.46.235.120'
+          - '10.46.225.110'
+        port: 20991
+        httpPort: 30991
+        extport: 7999
+      - name: stash.delta.sbrf.ru
+        ip: 
+          - '10.58.131.8'
+          - '10.50.116.27'
+        port: 20992
+        httpPort: 30992
+        extport: 7999
+      - name: sbrf-bitbucket.sigma.sbrf.ru
+        ip: 
+          - '10.18.157.23'
+          - '10.41.209.22'
+          - '10.41.217.50'
+        port: 20993
+        httpPort: 30993
+        extport: 7999
+
+      
+
+secman:
+  hosts: 
+  - name: ift.secrets.sigma.sbrf.ru
+    ip: 
+      - '10.46.228.57'
+    port: 8550
+
+
+k8sapi:
+  hosts: 
+  - name: api.psi-gen.sigma.sbrf.ru
+    ip: 
+      - '172.30.0.1'
+    port: 10000
+
+prometheus:
+  csmon:
+    host: tvlds-csmon0015.delta.sbrf.ru
+    sni: tvlds-csmon0015.delta.sbrf.ru
+    hosts:
+    - name: tvlds-csmon0015.delta.sbrf.ru
+      port: 1994 
+  federate: 
+    ip: 29.66.199.94
+  remote_write:
+    url: http://tvlds-csmon0015.delta.sbrf.ru
+    port: 8428
+
+postgres:
+  db:
+    names:
+      main: "orch"
+
+  port: 6544
+  asyncport: 5433
+  hosts: 
+  - name: pvlsd-orch00007.sigma.sbrf.ru
+    ip: 
+      - '10.19.92.216'
+    port: 5050
+  protocol: TCP 
+  resolution: STATIC
+
+sberworks:
+  port: 9093
+  hosts:
+    - name: tkles-lasw00014.vm.esrt.cloud.sbrf.ru
+      ip: 
+        - '10.57.6.243'
+      port: 7779
+    - name: tkles-lasw00015.vm.esrt.cloud.sbrf.ru
+      ip: 
+        - '10.57.6.225'
+      port: 7778
+    - name: tkles-lasw00016.vm.esrt.cloud.sbrf.ru
+      ip: 
+        - '10.57.6.244'
+      port: 7777
+  fqdn: esb.psi.devopsaudit.sigma.sbrf.ru
+  postfix: psi

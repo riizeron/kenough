@@ -1,0 +1,30 @@
+
+{{- $namespace := .Values.namespace }}
+{{ if eq .Release.Namespace $namespace }}
+
+{{- $istiocomp := "ingressgateway" -}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: {{ $istiocomp }}-{{ $namespace }}
+    istio: {{ $istiocomp }}-{{ $namespace }}
+  name: {{ $istiocomp }}-svc
+  namespace: {{ $namespace }}
+spec:
+  ports:
+  - name: status-port
+    port: 15020
+    protocol: TCP
+    targetPort: 15020
+  - name: {{ lower (index .Values "api" "protocol") }}-{{ index .Values "api" "port" }}
+    port: {{ index .Values "api" "port" }}
+  - name: {{ lower .Values.prometheus.extprotocol }}-{{ .Values.prometheus.extport }}
+    port: {{ .Values.prometheus.extport }}
+
+  selector:
+    app: {{ $istiocomp }}-{{ $namespace }}
+    istio: {{ $istiocomp }}-{{ $namespace }}
+
+{{- end }}

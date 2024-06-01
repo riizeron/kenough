@@ -1,0 +1,90 @@
+{{- $namespace := .Release.Namespace }}
+
+{{- $serv := "prometheus" -}}
+
+# Source: suppd-backend/templates/cm/prometheus-cm.yaml
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: prometheus-config
+  namespace: {{ $namespace }}
+data:
+  prometheus.yml: |-
+    global:
+      scrape_interval: 30s
+      scrape_timeout: 30s
+      evaluation_interval: 30s
+    scrape_configs:
+    - job_name: federate
+      scrape_interval: 2m
+      scrape_timeout: 2m
+      honor_labels: true
+      honor_timestamps: true
+      params:
+        match[]:
+        - '{namespace="{{ $namespace }}"}'
+      metrics_path: /federate
+      scheme: https
+      static_configs:
+      - targets:
+        - {{ index .Values.prometheus.federate.host }}:{{ index .Values.prometheus.federate.extport }}
+      bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+      tls_config:
+        ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+        insecure_skip_verify: true
+      metric_relabel_configs:
+      - action: labeldrop
+        regex: prometheus_replica
+      - action: labeldrop
+        regex: prometheus
+    - job_name: namespace
+      metrics_path: /actuator/prometheus
+      scheme: http
+      kubernetes_sd_configs:
+      {{- range $key, $host := index .Values $serv "hosts" }}
+      - role: endpoints
+        api_server: https://{{ $host.name }}
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        namespaces:
+          names:
+          - "{{ $namespace }}"
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/service-ca.crt
+          insecure_skip_verify: true  
+      {{- end }}
+      relabel_configs:
+        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+          action: drop
+          regex: false
+        - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+          action: replace
+          target_label: __metrics_path__
+          regex: (.+)
+        - source_labels: [__address__, __meta_kubernetes_pod_annotation_prometheus_io_port]
+          action: replace
+          regex: ([^:]+)(?::\d+)?;(\d+)
+          replacement: $1:$2
+          target_label: __address__
+        - source_labels: [__meta_kubernetes_pod_container_port_number]
+          regex: 8081
+          action: keep
+        - action: labelmap
+          regex: __meta_kubernetes_pod_label_(.+)
+        - source_labels: [__meta_kubernetes_namespace]
+          action: replace
+          target_label: kubernetes_namespace
+        - source_labels: [__meta_kubernetes_pod_name]
+          action: replace
+          target_label: kubernetes_pod_name
+
+{{- if eq $namespace .Values.namespace }}
+
+    - job_name: 'orch-api'
+      static_configs:
+        - targets: ['orch-api-s:5000']
+      metrics_path: /serv/metrics 
+
+{{- end }}
+
+    remote_write:
+      - url: http://{{ index .Values.prometheus.csmon.host }}:{{ index .Values.prometheus.csmon.extport2 }}

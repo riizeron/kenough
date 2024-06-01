@@ -1,0 +1,30 @@
+__pycache__
+.venv*
+venv*
+target
+logs
+test-project
+secrets
+
+pass
+user
+secrets
+
+.pytest_cache
+
+cert
+
+test.py
+.ruff_cache
+
+# grpc
+*_pb2.py
+*_pb2_grpc.py
+
+tmp
+
+*.ipynb
+
+# JS
+node_modules
+*.js

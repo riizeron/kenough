@@ -1,0 +1,123 @@
+practices:
+  - ss
+  - sast
+  - sca
+  - mdast
+  - dast
+
+tools:
+  - gitleaks
+  - deepsecrets
+  - semgrep
+  - sbersca
+  - codeql
+  - checkmarx
+  - odc
+  - stingray
+  - zap
+
+sast:
+  semgrep:
+    - java
+    - python
+    - html
+    - c
+    - c++
+    - c#
+    - yaml
+    - javascript
+
+  codeql:
+    - python
+    - javascript
+    - typescript
+  
+  checkmarx:
+    - java
+    - python
+    - html
+    - c
+    - c++
+    - c#
+    - javascript
+
+languages:
+  - java
+  - python
+  - javascript
+  - html
+  - c++
+  - c
+  - yaml
+  
+  
+sca:
+  sbom:
+    sbersca:
+      - syft
+    
+  distrib:
+    odc:
+      # go
+      - go.mod
+      # c/c++
+      - cmakelists.txt
+      - .so
+      # java
+      - .jar
+      - .war
+      # python
+      - requirements.txt
+      - .py
+      - .whl
+      - .egg
+      - PKG-INFO
+      - METADATA
+      # c#
+      - .dll
+      - .exe
+      - .nuspec
+      - packages.config
+      # javascript
+      - package.json
+      - .js
+
+
+ss:
+  - gitleaks
+  - deepsecrets
+
+mdast:
+  stingray:
+    - .apk
+    - .ipa
+
+
+dast:
+  - zap
+
+clients:
+  Nexus:
+    - sbersca
+    - odc
+
+  Pipeline:
+    - checkmarx
+    - gitleaks
+
+  IaC:
+    - semgrep
+    - gitleaks
+    - deepsecrets
+
+  Test:
+    - sbersca
+    - odc
+    - stingray
+    - checkmarx
+    - codeql
+    - semgrep
+    - gitleaks
+    - deepsecrets
+    - zap
+

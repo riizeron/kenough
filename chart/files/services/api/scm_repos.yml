@@ -1,0 +1,40 @@
+sber:
+  hosts:
+  - stash.delta.sbrf.ru
+  - stash.sigma.sbrf.ru
+  - stage-stash.sigma.sbrf.ru
+  - sbrf-bitbucket.sigma.sbrf.ru
+
+  regex:
+    ssh:
+      pattern: ssh://git@(?P<host>[^/]+):(?P<port>[\d]+)/(?P<repo>.+).git
+      repl: ssh://git@\g<host>/\g<repo>.git 
+    http:
+      pattern: https?://(?P<host>[^/]+)/scm/(?P<repo>.+).git
+      repl: https://\g<host>/scm/\g<repo>.git
+
+
+sberscloud:
+  hosts:
+  - dzo.sw.sbc.space
+
+  regex:
+    ssh:
+      pattern: ssh://git@(?P<host>[^/]+):(?P<port>[\d]+)/(?P<repo>.+).git
+      repl: ssh://git@\g<host>/\g<repo>.git
+    http:
+      pattern: https?://(?P<host>[^/]+)/(?P<type>[^/]+)/scm/(?P<repo>.+).git
+
+
+default:
+  hosts:
+  - github.com
+  - gitlab.com
+
+  regex:
+    http: 
+      pattern: https?://(?P<host>[^/]+)/(?P<repo>.+).git
+      repl: https://\g<host>/\g<repo>.git
+    ssh:
+      pattern: git@(?P<host>[^/]+)/(?P<repo>.+).git
+      repl: git@\g<host>:\g<repo>.git

@@ -1,0 +1,75 @@
+{{- $namespace := .Values.namespace }}
+{{ if eq .Release.Namespace $namespace }}
+
+{{- $serv := "api" -}}
+{{- $istiocomp := "ingressgateway" -}}
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ $serv }}
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+  - .
+  gateways:
+  - {{ $serv }}
+  hosts:
+  - orch-api.{{ .Values.ingress_host }}
+  http:
+  {{- range $_, $route := index .Values $serv "routes" }}
+    - match:
+        - uri:
+            prefix: {{ $route.prefix }}
+      name: {{ $route.name }}
+      route:
+        - destination:
+            host: orch-api-s
+            port:
+              number: {{ index $.Values $serv "port" }}
+  {{- end }}
+
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: {{ $serv }}
+  namespace: {{ $namespace }}
+spec:
+  selector:
+    istio: {{ $istiocomp }}-{{ $namespace }}
+  servers:
+  - hosts:
+    - orch-api.{{ .Values.ingress_host }}
+    port:
+      name: {{ lower (index .Values  $serv "protocol") }}-{{ index .Values  $serv "port" }}
+      number: {{ index .Values  $serv "port" }}
+      protocol: {{ index .Values  $serv "protocol" }}
+    tls:
+      caCertificates: {{ $.Values.vault.mount_path }}/ca_chain
+      serverCertificate: {{ $.Values.vault.mount_path }}/certificate
+      mode: MUTUAL
+      privateKey: {{ $.Values.vault.mount_path }}/private_key
+
+---
+# apiVersion: route.openshift.io/v1
+# kind: Route
+# metadata:
+#   labels:
+#     app: {{ $istiocomp }}-{{ $namespace }}
+#     istio: {{ $istiocomp }}-{{ $namespace }}
+    
+#   name: {{ $serv }}-rt
+#   namespace: {{ $namespace }}
+# spec:
+#   host: orch-api.{{ .Values.ingress_host }}
+#   port:
+#     targetPort: {{ lower (index .Values  $serv "protocol") }}-{{ index .Values  $serv "port" }}
+#   tls:
+#     termination: passthrough
+#   to:
+#     kind: Service
+#     name: {{ $istiocomp }}-svc
+
+{{- end }}

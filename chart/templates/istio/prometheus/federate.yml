@@ -1,0 +1,118 @@
+
+{{- $namespace := .Release.Namespace }}
+
+{{- $serv := "federate" -}}
+{{- $ip := "ip" -}}
+{{- $istiocomp := "egressgateway" -}}
+{{- $prometheus := "prometheus" -}}
+
+---
+# Source: suppd-backend/templates/dr/prometheus-federate-server-dr.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: prometheus-federate-server-dr
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+    - .
+  host: {{ index .Values $prometheus $serv "host" }}
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+    portLevelSettings:
+      - port:
+          number: {{ index .Values $prometheus $serv "intport" }}
+        tls:
+          caCertificates: {{ $.Values.vault.mount_path }}/ca-chain.cert.pem
+          clientCertificate: {{ $.Values.vault.mount_path }}/certificate
+          mode: MUTUAL
+          privateKey: {{ $.Values.vault.mount_path }}/private_key
+          sni: {{ index .Values $prometheus $serv "host" }}
+  workloadSelector:
+    matchLabels:
+      istio: {{ $istiocomp }}-{{ $namespace }}
+
+---
+# Source: suppd-backend/templates/gw/prometheus-egress-federate-server-gw.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: prometheus-egress-federate-server-gw
+  namespace: {{ $namespace }}
+spec:
+  selector:
+    istio: egressgateway-{{ $namespace }}
+  servers:
+    - hosts:
+        - {{ index .Values $prometheus $serv "host" }}
+      port:
+        name: {{ lower (index .Values $prometheus $serv "protocol") }}-{{ index .Values $prometheus $serv "intport" }}
+        number: {{ index .Values $prometheus $serv "intport" }}
+        protocol: {{ index .Values $prometheus $serv "protocol" }}
+      # tls:
+      #   mode: PASSTHROUGH
+
+
+---
+# Source: suppd-backend/templates/se/prometheus-federate-se.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: prometheus-federate-se
+  namespace: {{ $namespace }}
+spec:
+  addresses:
+    - {{ index .Values $prometheus $serv "ip" }}
+  endpoints:
+    - address: {{ index .Values $prometheus $serv "ip" }}
+  exportTo:
+    - .
+  hosts:
+    - {{ index .Values $prometheus $serv "host" }}
+  location: MESH_EXTERNAL
+  ports:
+    - name: {{ lower (index .Values $prometheus $serv "protocol") }}-{{ index .Values $prometheus $serv "extport" }}
+      number: {{ index .Values $prometheus $serv "extport" }}
+      protocol: {{ index .Values $prometheus $serv "protocol" }}
+  resolution: {{ index .Values $prometheus $serv "resolution" }}
+
+---
+# Source: suppd-backend/templates/vs/prometheus-federate-server-vs.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: prometheus-federate-server-vs
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+    - .
+  gateways:
+    - prometheus-egress-federate-server-gw
+    - mesh
+  hosts:
+    - {{ index .Values $prometheus $serv "host" }}
+  tcp:
+    - match:
+        - destinationSubnets:
+            - {{ index .Values $prometheus $serv "ip" }}/32
+          gateways:
+            - mesh
+          port: {{ index .Values $prometheus $serv "extport" }}
+      route:
+        - destination:
+            host: {{ $istiocomp }}-svc
+            port:
+              number: {{ index .Values $prometheus $serv "intport" }}
+    - match:
+        - destinationSubnets:
+            - {{ index .Values $prometheus $serv "ip" }}/32
+          gateways:
+            - prometheus-egress-federate-server-gw
+          port: {{ index .Values $prometheus $serv "intport" }}
+  
+      route:
+        - destination:
+            host: {{ index .Values $prometheus $serv "host" }}
+            port:
+              number: {{ index .Values $prometheus $serv "extport" }}

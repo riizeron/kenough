@@ -1,0 +1,80 @@
+#ENGINE
+
+{{- $namespace := .Release.Namespace }}
+
+{{- $istiocomp := "egressgateway" -}}
+{{- $prometheus := "prometheus" -}}
+{{- $serv := "scrapper" -}}
+
+---
+# Source: suppd-backend/templates/dr/prometheus-pod-scrapper-dr.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: prometheus-pod-{{ $serv }}-dr
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+    - .
+  host: {{ index .Values $prometheus $serv "host" }}
+  trafficPolicy:
+        tls:
+          mode: {{ index .Values $prometheus $serv "tlsMode" }}
+  workloadSelector:
+    matchLabels:
+      istio: {{ $istiocomp }}-{{ $namespace }}
+---
+# Source: suppd-backend/templates/envoy/prometheus-ef.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: prometheus-ef
+  namespace: {{ $namespace }}
+spec:
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_OUTBOUND
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+              subFilter:
+                name: envoy.filters.http.router
+          portNumber: {{ index .Values $prometheus $serv "port" }}
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.lua
+          typed_config:
+            '@type': type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua
+            inlineCode: >-
+              function envoy_on_request(handle)
+                local real_authority = handle:headers():get(":authority")
+                local authority = "{{ index .Values $prometheus $serv "host" }}"
+                handle:logInfo("Rewrite authority: "..real_authority.." -> "..authority)
+                handle:headers():replace(":authority", authority)
+              end
+  workloadSelector:
+    labels:
+      app: prometheus-{{ $namespace }}
+
+
+---
+# Source: suppd-backend/templates/se/prometheus-pod-scrapper-se.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: prometheus-pod-scrapper-se
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+    - .
+  hosts:
+    - {{ index .Values $prometheus $serv "host" }}
+  location: MESH_INTERNAL
+  ports:
+    - name: {{ lower (index .Values $prometheus $serv "protocol") }}-{{ index .Values $prometheus $serv "port" }}
+      number: {{ index .Values $prometheus $serv "port" }}
+      protocol: {{ index .Values $prometheus $serv "protocol" }}
+  resolution: NONE

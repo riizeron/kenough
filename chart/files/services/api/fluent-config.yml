@@ -1,0 +1,51 @@
+{{- $serv := "sberworks" -}}
+
+[SERVICE]
+    Parsers_File    /fluent-bit/etc/parsers.conf
+
+[INPUT]
+    Name              tail
+    Path              /logs/*.log
+    Tag               orch-api
+    read_from_head   true
+    multiline.parser python, python-multiline-regex
+
+[FILTER]
+    Name          rewrite_tag
+    Match         orch-api
+    Rule          $log ^.*INFO.*$ orch-api.info false
+
+[FILTER]
+    Name          rewrite_tag
+    Match         orch-api
+    Rule          $log ^.*ERROR.*$ orch-api.error false
+
+[FILTER]
+    Name          rewrite_tag
+    Match         orch-api
+    Rule          $log ^.*WARNING.*$ orch-api.warn false
+
+[FILTER]
+    Name parser
+    Match orch-api.*
+    Key_Name log
+    Parser orch-api-task_status
+
+[FILTER]
+    Name parser
+    Match orch-api.*
+    Key_Name log
+    Parser orch-api-requests
+
+[FILTER]
+    Name parser
+    Match orch-api.*
+    Key_Name log
+    Parser orch-api-message
+
+
+[OUTPUT]
+    Name          stdout
+    Match         *  
+    Format        json_lines
+

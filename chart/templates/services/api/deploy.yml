@@ -1,0 +1,177 @@
+
+{{- $namespace := .Values.namespace -}}
+{{ if eq .Release.Namespace $namespace }}
+
+{{- $serv := "api" -}}
+
+{{- $istio := .Values.istio_enabled -}}
+{{- $vault := .Values.vault_enabled -}}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ index .Values $serv "name" }}
+  namespace: {{ $namespace }}
+  labels:
+    chart: orch
+spec:
+  replicas: {{ index .Values $serv "replicas" }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ index .Values $serv "name" }}
+  template:
+    metadata:
+      annotations:
+        {{ if $istio -}}
+        sidecar.istio.io/inject: "true"
+        sidecar.istio.io/rewriteAppHTTPProbers: "false"
+        readiness.status.sidecar.istio.io/failureThreshold: "30"
+        readiness.status.sidecar.istio.io/initialDelaySeconds: "120"
+        readiness.status.sidecar.istio.io/periodSeconds: "5"
+        sidecar.istio.io/proxyCPU: {{ .Values.istio.resources.cpu }}m
+        sidecar.istio.io/proxyCPULimit: {{ .Values.istio.resources.cpu }}m
+        sidecar.istio.io/proxyMemory: {{ .Values.istio.resources.memory }}Mi
+        sidecar.istio.io/proxyMemoryLimit: {{ .Values.istio.resources.memory }}Mi
+        proxy.istio.io/config: |
+          holdApplicationUntilProxyStarts: true
+        {{ end -}}
+        {{ if $vault -}}
+        vault.hashicorp.com/namespace: {{ .Values.vault.namespace }}
+        vault.hashicorp.com/agent-limits-cpu: {{ .Values.vault.resources.cpu }}m
+        vault.hashicorp.com/agent-limits-mem: {{ .Values.vault.resources.memory }}Mi
+        vault.hashicorp.com/agent-requests-cpu: {{ .Values.vault.resources.cpu }}m 
+        vault.hashicorp.com/agent-requests-mem: {{ .Values.vault.resources.memory }}Mi
+        vault.hashicorp.com/namespace: {{ .Values.vault.namespace }}
+        vault.hashicorp.com/role: {{ $namespace }}
+        vault.hashicorp.com/agent-inject: 'true'
+        vault.hashicorp.com/agent-init-first: 'true'
+        vault.hashicorp.com/agent-pre-populate: 'false'
+        {{ range $_, $serv_secret := index .Values $serv "secrets" }}
+        {{ $secret := index $.Values.vault.secrets $serv_secret }}
+        {{ range $_, $key := $secret.keys }}
+        vault.hashicorp.com/agent-inject-secret-{{ $serv_secret }}-{{ $key }}: "true"
+        vault.hashicorp.com/secret-volume-path-{{ $serv_secret }}-{{ $key }}: {{ $.Values.vault.mount_path }}
+        vault.hashicorp.com/agent-inject-template-{{ $serv_secret }}-{{ $key }}: >
+          {{`{{- with secret`}}
+          "{{ $.Values.vault.namespace }}/{{ $.Values.vault.secret_path }}/orch/{{ $serv_secret }}"
+          {{`}}{{ index .Data "`}}{{ $key }}{{`" }}{{- end }}`}}
+        {{ end -}}{{ end -}}{{ end -}}
+        checksum/config: {{ include "orch.checksum/config" . }}
+        hash: {{ (index .Values.hash $serv) | default "nil"}}
+      labels:
+        app.kubernetes.io/name: {{ index .Values $serv "name" }}
+        name: {{ index .Values $serv "name" }}
+        chart: orch
+        {{ if $vault -}}
+        secman-injector: enabled
+        {{- end }}   
+    spec:
+      restartPolicy: {{ .Values.restartPolicy }}
+      serviceAccountName: {{ index .Values $serv "serviceAccountName" }}
+      imagePullSecrets: {{ .Values.imagePullSecrets | toYaml | nindent 8 }}
+
+      containers:
+        - image: {{ include "orch.image" (merge (dict "Serv" $serv) .) }} 
+          name: {{ index .Values $serv "name" }}
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+          ports:
+          - containerPort: {{ index .Values $serv "port" }}
+         
+          livenessProbe:
+            httpGet:
+              path: /serv/healthz
+              port: 5000
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+
+          readinessProbe:
+            httpGet:
+              path: /serv/healthz
+              port: 5000
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+
+          volumeMounts:
+          - name: config
+            mountPath: /opt/{{ $serv }}/config.yml
+            subPath: config.yml
+          - name: config
+            mountPath: /opt/{{ $serv }}/info.json
+            subPath: info.json
+          - name: config
+            mountPath: /opt/{{ $serv }}/tools.yml
+            subPath: tools.yml
+          - name: config
+            mountPath: /opt/{{ $serv }}/langs.yml
+            subPath: langs.yml
+          - name: config
+            mountPath: /opt/{{ $serv }}/scm_repos.yml
+            subPath: scm_repos.yml
+          - name: git-access-check
+            mountPath: /tmp/git-access-check
+          - name: liveness-check
+            mountPath: /tmp/liveness-check
+          - name: logs
+            mountPath: /tmp/logs
+          {{- include "orch.resources" (merge (dict "Serv" $serv) .) | nindent 10 }}
+
+        - image: {{ .Values.fluentbit.image }}
+          name: fluentbit
+          imagePullPolicy: Always
+          securityContext:
+            privileged: false
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+          env:
+          - name: APP_NAME
+            valueFrom: 
+              fieldRef:
+                fieldPath: metadata.labels['app']
+          volumeMounts:
+          - name: fluentbit-emptydir
+            mountPath: /tmp/
+          - name: fluentbit-config
+            mountPath: /fluent-bit/etc/
+          - name: logs
+            mountPath: /logs
+
+          {{- include "orch.resources" (merge (dict "Serv" "fluentbit") .) | nindent 10 }}
+
+      volumes:
+      - name: config
+        configMap:
+          name: {{ index .Values $serv "name" }}-cm
+          defaultMode: {{ .Values.mount_mode }}
+      - name: git-access-check
+        emptyDir: {}
+      - name: liveness-check
+        emptyDir: {}
+      - name: fluentbit-config
+        configMap:
+          name: fluentbit-orch-{{ $serv }}
+          defaultMode: {{ .Values.mount_mode }}
+      - name: fluentbit-emptydir
+        emptyDir: {} 
+      - name: logs
+        emptyDir: {}   
+      
+
+  strategy:
+    type: {{ .Values.strategy.type }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.strategy.rollingUpdate.maxUnavailable }}
+      maxSurge: {{ .Values.strategy.rollingUpdate.maxSurge }}
+  revisionHistoryLimit: {{ .Values.strategy.revisionHistoryLimit }}
+  progressDeadlineSeconds: {{ .Values.strategy.progressDeadlineSeconds }}
+  
+{{- end }}

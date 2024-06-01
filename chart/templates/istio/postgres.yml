@@ -1,0 +1,104 @@
+
+{{- $namespace := .Release.Namespace }}
+
+{{- $serv := "postgres" -}}
+{{- $istiocomp := "egressgateway" -}}
+
+
+--- 
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: {{ $serv }}
+  namespace: {{ $namespace }}
+spec:
+  selector:
+    istio: {{ $istiocomp }}-{{ $namespace }}
+  servers:
+{{- range $_, $host := index .Values $serv "hosts" }}
+  - hosts:
+    - {{ $host.name }}
+    port:
+      name: {{ lower (index $.Values $serv "protocol") }}-{{ $host.port }}
+      number: {{ $host.port }}
+      protocol: {{ index $.Values $serv "protocol" }}
+{{- end }}
+
+{{- range $key, $host := index .Values $serv "hosts" }}
+{{- $name := (split "." $host.name)._0 }}
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:   
+  name: {{ $serv }}-{{ $name }}
+  namespace: {{ $namespace }}
+spec:
+  addresses: 
+  {{- range $_, $ip := $host.ip }}
+    - {{ $ip }}
+  {{- end }}
+  endpoints:
+  {{- range $_, $ip := $host.ip }}
+    - address: {{ $ip }}
+  {{- end }}
+  exportTo:
+    - .
+  hosts:
+    - {{ $host.name }}
+  location: MESH_EXTERNAL
+  ports:
+    - name: {{ lower (index $.Values $serv "protocol") }}-{{ index $.Values $serv "port" }}
+      number: {{ index $.Values $serv "port" }}
+      protocol: {{ index $.Values $serv "protocol" }}
+    - name: {{ lower (index $.Values $serv "protocol") }}-{{ index $.Values $serv "asyncport" }}
+      number: {{ index $.Values $serv "asyncport" }}
+      protocol: {{ index $.Values $serv "protocol" }}
+  resolution: {{ index $.Values $serv "resolution" }}
+{{ end }}
+
+
+{{- range $key, $host := index .Values $serv "hosts" }}
+{{- $name := (split "." $host.name)._0 }}
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ $serv }}-{{ $name }}
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+  - .
+  gateways:
+  - {{ $serv }}
+  - mesh
+  hosts:
+  - {{ $host.name }}
+  tcp:
+  - match:  
+    - destinationSubnets:
+      {{- range $_, $ip := $host.ip }}
+      - {{ $ip }}/32
+      {{- end }}
+      gateways:
+      - mesh
+      port: {{ index $.Values $serv "port" }}
+    route:
+    - destination:
+        host: {{ $istiocomp }}-svc
+        port:
+          number: {{ $host.port }}
+  - match:
+    - destinationSubnets:
+      {{- range $_, $ip := $host.ip }}
+        - {{ $ip }}/32
+      {{- end }}
+      gateways:
+      - {{ $serv }}
+      port: {{ $host.port }}
+    route:
+    - destination:
+        host: {{ $host.name }}
+        port:
+          number: {{ index $.Values $serv "port" }}
+{{ end }}

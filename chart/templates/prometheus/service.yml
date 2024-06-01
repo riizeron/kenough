@@ -1,0 +1,24 @@
+
+{{- $namespace := .Release.Namespace }}
+
+{{- $serv := "prometheus" -}}
+
+---
+# Source: suppd-backend/templates/srv/prometheus-cm.yaml
+kind: Service
+apiVersion: v1
+metadata:
+  name: prometheus-{{ $namespace }}
+  namespace: {{ $namespace }}
+  labels:
+    app: prometheus-{{ $namespace }}
+    istio: prometheus-{{ $namespace }}
+spec:
+  ports:
+    - protocol: {{ index .Values $serv "intprotocol" }}
+      port: {{ index .Values $serv "port" }}
+      targetPort: {{ index .Values $serv "port" }}
+      name: {{ lower (index .Values $serv "intprotocol") }}-{{ index .Values $serv "port" }}
+  selector:
+    app: prometheus-{{ $namespace }}
+    istio: prometheus-{{ $namespace }}

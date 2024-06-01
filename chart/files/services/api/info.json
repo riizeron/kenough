@@ -1,0 +1,80 @@
+{"info" : [ 
+  {
+    "DAST" :  {
+              "DASTInstr0" : {
+                "name" : "DASTInstr0",
+                "fields" : ["field0", "field1"]
+              },
+              "DASTInstr1" : {
+                "name" : "DASTInstr1",
+                "fields" : ["field2", "field1"]
+              }
+    },
+    "SAST" : {
+              "SCAInstr0" : {
+                "name" : "Semgrep",
+                "fields" : ["language"]
+              }
+    },
+    "SCA" : {
+              "SCAInstr0" : {
+                "name" : "ODC",
+                "fields" : ["language"]
+              },
+              "SCAInstr1" : {
+                "name" : "SberSCA",
+                "fields" : ["language"]
+              }  
+    }
+  },
+  {
+    "fields" : [
+                {
+                  "id" : "language",
+                  "text" : "Выберите язык",
+                  "type" : "select",
+                  "values" : ["java", "python", "c++", "js"]
+                },
+                {
+                  "id" : "Preset",
+                  "text" : "Выберите пресет",
+                  "type" : "select",
+                  "values" : ["Custom", "Mobile", "SB"]
+                },
+                {
+                  "id" : "CmdId",
+                  "text" : "Введите команду",
+                  "type" : "input",
+                  "values" : []
+                }
+              ]
+  },
+  {
+    "subfields" : {
+                    "java" : {
+                                "id" : "java_builder",
+                                "text" : "Выберите сборщик",
+                                "type" : "select",
+                                "values" : ["maven", "gradle"]
+                              },
+                    "c++" : {
+                                "id" : "compId",
+                                "text" : "Выберите комплиятор",
+                                "type" : "select",
+                                "values" : ["gcc", "g++"]
+                              },
+                    "maven" : {
+                                "id" : "maven_version",
+                                "text" : "Выберите версию сборщика",
+                                "type" : "select",
+                                "values" : ["4.0", "3.9"]
+                              },
+                    "python" : {
+                                "id" : "python_version",
+                                "text" : "Выберите версию питона",
+                                "type" : "select",
+                                "values" : ["3.8", "3.9"]
+                              }
+                  }
+  }
+]}

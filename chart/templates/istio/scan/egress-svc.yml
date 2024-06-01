@@ -1,0 +1,93 @@
+
+{{- $namespace := .Values.job_namespace }}
+{{ if eq .Release.Namespace $namespace }}
+
+{{- $istiocomp := "egressgateway" -}}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $istiocomp }}-svc
+  namespace: {{ $namespace }}
+spec:
+  ports:
+{{- $protocol:=(.Values.bb.protocol) }}
+{{- range $_, $host := .Values.bb.hosts }}
+  - name: {{ lower $protocol }}-{{ $host.port }}
+    port: {{ $host.port }}
+    protocol:  TCP
+  - name: {{ lower $protocol }}-{{ $host.httpPort }}
+    port: {{ $host.httpPort }}
+    protocol: TCP
+{{- end }}
+{{- $protocol:=(.Values.nexus.protocol) }}
+{{- range $_, $host := .Values.nexus.hosts }}
+  - name: {{ lower $protocol }}-{{ $host.port }}
+    port: {{ $host.port }}
+    protocol:  TCP
+{{- end }}
+{{- $protocol:=(.Values.sbomgen.protocol) }}
+{{- range $_, $host := .Values.sbomgen.hosts }}
+  - name: {{ lower $protocol }}-{{ $host.port }}
+    port: {{ $host.port }}
+    protocol:  TCP
+{{- end }}
+
+{{- $protocol:=(.Values.secman.protocol) }}
+{{- range $_, $host := .Values.secman.hosts }}
+  - name: {{ lower $protocol }}-{{ $host.port }}
+    port: {{ $host.port }}
+    protocol:  TCP
+{{- end }}
+
+{{- $protocol:=(.Values.prometheus.protocol) }}
+{{- range $_, $host := .Values.prometheus.csmon.hosts }}
+  - name: {{ lower $protocol }}-{{ $host.port }}
+    port: {{ $host.port }}
+    protocol:  TCP
+{{- end }}
+{{- $protocol:=(.Values.prometheus.protocol) }}
+{{- range $_, $host := .Values.prometheus.federate.hosts }}
+  - name: {{ lower $protocol }}-{{ $host.port }}
+    port: {{ $host.port }}
+    protocol:  TCP
+{{- end }}
+{{- $protocol:=(.Values.sberworks.protocol) }}
+{{- range $_, $host := .Values.sberworks.hosts }}
+  - name: {{ lower $protocol }}-{{ $host.port }}
+    port: {{ $host.port }}
+    protocol:  TCP
+{{- end }}
+
+{{- $protocol:=(.Values.osvdev.protocol) }}
+{{- range $_, $host := .Values.osvdev.hosts }}
+  - name: {{ lower $protocol }}-{{ $host.port }}
+    port: {{ $host.port }}
+    protocol:  TCP
+{{- end }}
+{{- $protocol:=(.Values.nvd.protocol) }}
+{{- range $_, $host := .Values.nvd.hosts }}
+  - name: {{ lower $protocol }}-{{ $host.port }}
+    port: {{ $host.port }}
+    protocol:  TCP
+{{- end }}
+{{- $protocol:=(.Values.checkmarx.protocol) }}
+{{- range $_, $host := .Values.checkmarx.hosts }}
+  - name: {{ lower $protocol }}-{{ $host.port }}
+    port: {{ $host.port }}
+    protocol:  TCP
+{{- end }}
+{{- $protocol:=(.Values.stingray.protocol) }}
+{{- range $_, $host := .Values.stingray.hosts }}
+  - name: {{ lower $protocol }}-{{ $host.port }}
+    port: {{ $host.port }}
+    protocol:  TCP
+{{- end }}
+
+
+  selector:
+    app: {{ $istiocomp }}-{{ $namespace }}
+    istio: {{ $istiocomp }}-{{ $namespace }}
+
+{{- end }}

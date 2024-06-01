@@ -1,0 +1,13 @@
+{{- $serv := "semgrep" }}
+# required
+name: semgrep
+practice: sast
+src: {{ .Values.src }}
+results: {{ .Values.results }}
+rules: ./semgrep-rules
+
+wait_flag: {{ index .Values "source-checkout" "flag" }}
+errpath: {{ .Values.errors }}
+logpath: {{ .Values.logs }}
+
+tmp: {{ .Values.tmp }}

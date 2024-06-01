@@ -1,0 +1,18 @@
+
+{{- $namespace := .Values.job_namespace -}}
+{{ if eq .Release.Namespace $namespace }}
+
+{{- $serv := "fluentbit" -}}
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: fluentbit-config
+  namespace: {{ $namespace }}
+data:
+  fluent-bit.conf: |-
+    {{ (tpl (.Files.Get "files/sidecars/fluentbit/config.yml") . ) | nindent 4 }}
+
+  parsers.conf: |-
+    {{ (tpl (.Files.Get "files/sidecars/fluentbit/parsers.yml") . ) | nindent 4 }}
+    
+{{- end }}

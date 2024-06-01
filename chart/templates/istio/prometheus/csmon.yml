@@ -1,0 +1,109 @@
+{{- $namespace := .Release.Namespace }}
+
+{{- $serv := "csmon" -}}
+{{- $istiocomp := "egressgateway" -}}
+{{- $prometheus := "prometheus" -}}
+
+---
+# Source: suppd-backend/templates/dr/prometheus-federate-server-dr.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: csmon-dr
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+    - .
+  host: {{ index .Values $prometheus $serv "host" }}
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+    portLevelSettings:
+      - port:
+          number: {{ index .Values $prometheus $serv "druleport" }}
+        tls:
+          caCertificates: /tmp/secrets/ca_chain
+          clientCertificate: /tmp/secrets/certificate
+          mode: MUTUAL
+          privateKey: /tmp/secrets/private_key
+          sni: {{ index .Values $prometheus $serv "sni" }}
+
+  workloadSelector:
+    matchLabels:
+      istio: {{ $istiocomp }}-{{ $namespace }}
+
+---
+# Source: suppd-backend/templates/gw/prometheus-egress-federate-server-gw.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: csmon-gw
+  namespace: {{ $namespace }}
+spec:
+  selector:
+    istio: egressgateway-{{ $namespace }}
+  servers:
+    - hosts:
+        - {{ index .Values $prometheus $serv "host" }}
+      port:
+        name: {{ lower (index .Values $prometheus $serv "protocol") }}-{{ index .Values $prometheus $serv "gatewayport" }}
+        number: {{ index .Values $prometheus $serv "gatewayport" }}
+        protocol: {{ index .Values $prometheus $serv "protocol" }}
+
+
+---
+# Source: suppd-backend/templates/se/prometheus-federate-se.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:
+  name: csmon-se
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+    - .
+  hosts:
+    - {{ index .Values $prometheus $serv "host" }}
+  location: MESH_EXTERNAL
+  ports:
+    - name: {{ lower (index .Values $prometheus $serv "extprotocol") }}-{{ index .Values $prometheus $serv "extport1" }}
+      number: {{ index .Values $prometheus $serv "extport1" }}
+      protocol: {{ index .Values $prometheus $serv "extprotocol" }}
+    - name: {{ lower (index .Values $prometheus $serv "protocol") }}-{{ index .Values $prometheus $serv "extport2" }}
+      number: {{ index .Values $prometheus $serv "extport2" }}
+      protocol: {{ index .Values $prometheus $serv "protocol" }}
+  resolution: {{ index .Values $prometheus $serv "resolution" }}
+
+---
+# Source: suppd-backend/templates/vs/prometheus-federate-server-vs.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: csmon-vs
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+    - .
+  gateways:
+    - csmon-gw
+    - mesh
+  hosts:
+    - {{ index .Values $prometheus $serv "host" }}
+  http:
+    - match:
+        - gateways:
+            - mesh
+          port: {{ index .Values $prometheus $serv "extport2" }}
+      route:
+        - destination:
+            host: {{ $istiocomp }}-svc
+            port:
+              number: {{ index .Values $prometheus $serv "gatewayport" }}
+    - match:
+        - gateways:
+            - csmon-gw
+          port: {{ index .Values $prometheus $serv "gatewayport" }}
+      route:
+        - destination:
+            host: {{ index .Values $prometheus $serv "host" }}
+            port:
+              number: {{ index .Values $prometheus $serv "extport1" }}

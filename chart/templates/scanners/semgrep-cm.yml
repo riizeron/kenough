@@ -1,0 +1,13 @@
+
+{{- $namespace := .Values.job_namespace -}}
+{{ if eq .Release.Namespace $namespace }}
+{{- $serv := "semgrep" -}}
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: {{ $serv }}-cm
+  namespace: {{ $namespace }}
+data:
+  config.yml: |-
+    {{ (tpl (.Files.Get "files/scanners/semgrep_config.yml") . ) | nindent 4 }}
+{{- end }} 

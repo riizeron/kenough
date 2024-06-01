@@ -1,0 +1,19 @@
+
+{{- $namespace := .Values.namespace -}}
+{{ if eq .Release.Namespace $namespace }}
+
+{{- $serv := "api" -}}
+kind: Service
+apiVersion: v1
+metadata:
+  name: {{ index .Values $serv "name" }}-s
+  namespace: {{ $namespace }}
+spec:
+  ports:
+    - protocol: {{ .Values.service.protocol }}
+      port: {{ index .Values $serv "port" }}
+      targetPort: {{ index .Values $serv "port" }}
+  selector:
+    app.kubernetes.io/name: {{ index .Values $serv "name" }}
+
+{{- end }}

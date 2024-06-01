@@ -1,0 +1,350 @@
+
+{{- $namespace := .Release.Namespace }}
+
+{{- $serv := "ingressgateway" -}}
+
+{{- $vault := .Values.vault_enabled -}}
+{{- $control_panel := include (print "istio.control_panel") . }}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ $serv }}-{{ $namespace }}
+    app.kubernetes.io/component: gateways
+    app.kubernetes.io/instance: {{ $control_panel }}
+    app.kubernetes.io/name: gateways
+    app.kubernetes.io/part-of: istio
+    chart: gateways
+    heritage: Tiller
+    istio: {{ $serv }}-{{ $namespace }}
+    release: istio
+  name: {{ $serv }}-{{ $namespace }}
+  namespace: {{ $namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ $serv }}-{{ $namespace }}
+      istio: {{ $serv }}-{{ $namespace }}
+  strategy:
+    type: {{ .Values.strategy.type }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.strategy.rollingUpdate.maxUnavailable }}
+      maxSurge: {{ .Values.strategy.rollingUpdate.maxSurge }}
+  revisionHistoryLimit: {{ .Values.strategy.revisionHistoryLimit }}
+  progressDeadlineSeconds: {{ .Values.strategy.progressDeadlineSeconds }}
+  template:
+    metadata:
+      annotations:
+        sidecar.istio.io/inject: "false"
+        {{ if eq $vault true -}}
+        vault.hashicorp.com/agent-init-first: "true" 
+        vault.hashicorp.com/agent-inject-containers: "istio-proxy"
+        vault.hashicorp.com/agent-inject: "true" 
+        vault.hashicorp.com/agent-limits-cpu: {{ .Values.vault.resources.cpu }}m
+        vault.hashicorp.com/agent-limits-mem: {{ .Values.vault.resources.memory }}Mi
+        vault.hashicorp.com/agent-requests-cpu: {{ .Values.vault.resources.cpu }}m 
+        vault.hashicorp.com/agent-requests-mem: {{ .Values.vault.resources.memory }}Mi
+        vault.hashicorp.com/namespace: {{ .Values.vault.namespace }}
+        vault.hashicorp.com/agent-pre-populate: "true" 
+        vault.hashicorp.com/role: {{ $namespace }}
+        {{- range $_, $serv_secret := index .Values $serv "secrets" }}
+        {{- $secret := index $.Values.vault.secrets $serv_secret }}
+       
+        {{- range $_, $key := $secret.concat_keys }}
+        vault.hashicorp.com/agent-inject-secret-{{ index $key "filename" }}: "true"
+        vault.hashicorp.com/secret-volume-path-{{ index $key "filename" }}: {{ $.Values.vault.mount_path }}
+        vault.hashicorp.com/agent-inject-template-{{ index $key "filename" }}: >
+          {{`{{- with secret
+          `}} "{{ $.Values.vault.namespace }}/{{ $.Values.vault.certs_path }}/fetch/{{ $.Values.api.name }}-{{ regexReplaceAllLiteral "\\." $.Values.ingress_host "-" }}-server" 
+          "common_name={{ $.Values.api.name }}.{{ $.Values.ingress_host }}" 
+          "email={{ $.Values.vault.email }}" "format={{ $.Values.vault.format }}" "alt_names=
+          prometheus.engine.{{ $.Values.ingress_host }},
+          prometheus.scan.{{ $.Values.ingress_host }}" -}}
+          {{ range $_, $conckey := $key.values }}{{`{{ index .Data "`}}{{ $conckey }}" }}{{- end }}  {{ `
+          {{- end }}`}}
+        {{- end -}}  
+        
+        {{- range $_, $key := $secret.keys }}
+        vault.hashicorp.com/agent-inject-secret-{{ $key }}: "true"
+        vault.hashicorp.com/secret-volume-path-{{ $key }}: {{ $.Values.vault.mount_path }}
+        vault.hashicorp.com/agent-inject-template-{{ $key }}: >
+          {{`{{- with secret
+          `}}"{{ $.Values.vault.namespace }}/{{ $.Values.vault.certs_path }}/fetch/{{ $.Values.api.name }}-{{ regexReplaceAllLiteral "\\."  $.Values.ingress_host  "-" }}-server" 
+          "common_name={{ $.Values.api.name }}.{{ $.Values.ingress_host }}" 
+          "email={{ $.Values.vault.email }}" "format={{ $.Values.vault.format }}" "alt_names=
+          prometheus.engine.{{ $.Values.ingress_host }},
+          prometheus.scan.{{ $.Values.ingress_host }}" -}}
+          {{`{{ index .Data "`}}{{ $key }}{{`" }}
+          {{- end }}`}}
+        {{- end }}{{ end }}{{ end }}
+      labels:
+        fluentLogs: enable
+        app: {{ $serv }}-{{ $namespace }}
+        name: {{ $serv }}-{{ $namespace }}
+        chart: gateways
+        heritage: Tiller
+        istio: {{ $serv }}-{{ $namespace }}
+        release: istio
+        {{ if eq $vault true -}}
+        secman-injector: enabled
+        {{- end }}  
+    spec:
+      imagePullSecrets: {{ .Values.imagePullSecrets | toYaml | nindent 8 }}
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+            weight: 2
+          - preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - ppc64le
+            weight: 2
+          - preference:
+              matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - s390x
+            weight: 2
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: beta.kubernetes.io/arch
+                operator: In
+                values:
+                - amd64
+                - ppc64le
+                - s390x
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - {{ $serv }}-{{ $namespace }}
+              topologyKey: kubernetes.io/hostname
+            weight: 1
+      containers:
+      - args:
+        - proxy
+        - --proxyLogPath
+        - $(ENVOY_LOGS_PATH)
+        - --log_output_level=default:info
+        - --log_target
+        - $(PILOT_AGENT_LOGS_PATH)
+        - --log_as_json=0
+        - --proxyLogFormat
+        - timestamp:[%Y-%m-%dT%T.%e],message:[%n][%v]
+        - router
+        - --domain
+        - $(POD_NAMESPACE).svc.cluster.local
+        - --proxyLogLevel=warning
+        - --proxyComponentLogLevel=misc:error
+        - --serviceCluster
+        - $(ISTIO_PROXY_NAME).$(POD_NAMESPACE)
+        - --trust-domain=cluster.local
+        env:
+        - name: DISABLE_ACCESSLOG_ROTATION
+          value: 'false'
+        - name: ISTIO_PROXY_NAME
+          value: {{ $serv }}-{{ $namespace }}
+        - name: PROXY_CONFIG
+          value: >
+            {"discoveryAddress":"istiod-{{ $control_panel }}.{{ $control_panel }}.svc:15012","tracing":{"custom_tags":{"authority":{"header":{"defaultValue":"authority-empty","name":":authority"}},"content-type":{"header":{"defaultValue":"content-type-empty","name":"content-type"}},"grpc-accept-encoding":{"header":{"defaultValue":"grpc-accept-encoding-empty","name":"grpc-accept-encoding"}},"host":{"header":{"defaultValue":"host-empty","name":"host"}},"method":{"header":{"defaultValue":"method-empty","name":":method"}},"path":{"header":{"defaultValue":"path-empty","name":":path"}},"scheme":{"header":{"defaultValue":"scheme-empty","name":":scheme"}},"x-b3-parentspanid":{"header":{"defaultValue":"x-b3-parentspanid-empty","name":"x-b3-parentspanid"}},"x-b3-sampled":{"header":{"defaultValue":"x-b3-sampled-empty","name":"x-b3-sampled"}},"x-b3-spanid":{"header":{"defaultValue":"x-b3-spanid-empty","name":"x-b3-spanid"}},"x-b3-traceid":{"header":{"defaultValue":"x-b3-traceid-empty","name":"x-b3-traceid"}},"x-envoy-decorator-operation":{"header":{"defaultValue":"x-envoy-decorator-operation-empty","name":"x-envoy-decorator-operation"}},"x-envoy-internal":{"header":{"defaultValue":"x-envoy-internal-empty","name":"x-envoy-internal"}},"x-forwarded-proto":{"header":{"defaultValue":"x-forwarded-proto-empty","name":"x-forwarded-proto"}},"x-forwarded_for":{"header":{"defaultValue":"x-forwarded-for-empty","name":"x-forwarded-for"}},"x-request-id":{"header":{"defaultValue":"x-request-id-empty","name":"x-request-id"}},"x-synapse-corellationid":{"header":{"defaultValue":"x-synapse-corellationid-empty","name":"x-synapse-corellationid"}},"x-synapse-custom":{"header":{"defaultValue":"x-synapse-custom-empty","name":"x-synapse-custom"}},"x-synapse-from-pod-name":{"header":{"defaultValue":"x-synapse-from-pod-name-empty","name":"x-synapse-from-pod-name"}},"x-synapse-messageid":{"header":{"defaultValue":"x-synapse-messageid-empty","name":"x-synapse-messageid"}},"x-synapse-operationname":{"header":{"defaultValue":"x-synapse-operationname-empty","name":"x-synapse-operationname"}},"x-synapse-rqtm":{"header":{"defaultValue":"x-synapse-rqtm-empty","name":"x-synapse-rqtm"}},"x-synapse-rquid":{"header":{"defaultValue":"x-synapse-rquid-empty","name":"x-synapse-rquid"}},"x-synapse-scname":{"header":{"defaultValue":"x-synapse-scname-empty","name":"x-synapse-scname"}},"x-synapse-serviceversion":{"header":{"defaultValue":"x-synapse-serviceversion-empty","name":"x-synapse-serviceversion"}},"x-synapse-spname":{"header":{"defaultValue":"x-synapse-spname-empty","name":"x-synapse-spname"}},"x-synapse-status-code":{"header":{"defaultValue":"x-synapse-status-code-empty","name":"x-synapse-status-code"}}},"zipkin":{"address":"synapse-tracer-svc.{{ $control_panel }}.svc.cluster.local:8788"}, "maxPathTagLength":256,"sampling":100,"tlsSettings":{"caCertificates":"/var/run/secrets/istio/root-cert.pem","mode":"SIMPLE","subjectAltNames":["spiffe://cluster.local/ns/{{ $control_panel }}>/sa/default"]}},"proxyMetadata":{"DNS_AGENT":""}}
+        - name: JWT_POLICY
+          value: third-party-jwt
+        - name: PILOT_CERT_PROVIDER
+          value: istiod
+        - name: CA_ADDR
+          value: istiod-{{ $control_panel }}.{{ $control_panel }}.svc:15012
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+        - name: INSTANCE_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.podIP
+        - name: HOST_IP
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: status.hostIP
+        - name: SERVICE_ACCOUNT
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: spec.serviceAccountName
+        - name: CANONICAL_SERVICE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['service.istio.io/canonical-name']
+        - name: CANONICAL_REVISION
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.labels['service.istio.io/canonical-revision']
+        - name: ISTIO_META_WORKLOAD_NAME
+          value: ingressgateway-{{ $namespace }}
+        - name: ISTIO_META_OWNER
+          value: kubernetes://apis/apps/v1/namespaces/{{ $namespace }}/deployments/ingressgateway-{{ $namespace }}
+        - name: ISTIO_META_MESH_ID
+          value: cluster.local
+        - name: TRUST_DOMAIN
+          value: cluster.local
+        - name: ISTIO_META_UNPRIVILEGED_POD
+          value: 'true'
+        - name: ISTIO_META_CLUSTER_ID
+          value: Kubernetes
+        - name: PILOT_AGENT_LOGS_PATH
+          value: /var/log/audit/application_logs.log
+        - name: ENVOY_LOGS_PATH
+          value: /var/log/audit/envoy_logs.log
+        - name: ACCESS_LOGS_PATH
+          value: /var/log/audit/access_logs.log
+        - name: ROTATION_INTERVAL
+          value: "1"
+        - name: KEEP_FILES_COUNT
+          value: "3"
+        - name: LOG_FILE_SIZE
+          value: 15M
+        - name: LOGROTATE_CONF_PATH
+          value: /var/log/audit/logrotate.config
+        - name: LOGROTATE_STATUS_PATH
+          value: /var/log/audit/logrotate.status
+        - name: LOGROTATE_OLDDIR_PATH
+          value: /var/log/audit/
+        image: {{ .Values.istioImage }}
+        imagePullPolicy: Always
+        name: istio-proxy
+        ports:
+        - containerPort: 15020
+          name: status-port
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 30
+          httpGet:
+            path: /healthz/ready
+            port: 15020
+            scheme: HTTP
+          initialDelaySeconds: 15
+          periodSeconds: 2
+          successThreshold: 1
+          timeoutSeconds: 5
+        
+        {{ include "orch.resources" (merge (dict "Serv" $serv) .) | nindent 8 }}
+        
+        securityContext:
+          capabilities:
+              drop:
+                - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - name: logs
+          mountPath: /var/log/audit
+        - name: istio-envoy
+          mountPath: /etc/istio/proxy
+        - name: istiod-ca-cert
+          mountPath: /var/run/secrets/istio
+        - name: istio-token
+          readOnly: true
+          mountPath: /var/run/secrets/tokens
+        - name: istio-data
+          mountPath: /var/lib/istio/data
+        - name: podinfo
+          mountPath: /etc/istio/pod
+        - name: socket
+          mountPath: /var/run/secrets/workload-spiffe-uds
+      - name: fluentbit
+        image: >-
+          {{ .Values.fluentbit.image }}
+        imagePullPolicy: Always
+        env:
+          - name: APP_NAME
+            valueFrom:
+              fieldRef:
+                apiVersion: v1
+                fieldPath: 'metadata.labels[''app'']'
+        securityContext:
+          readOnlyRootFilesystem: true
+        {{ include "orch.resources" (merge (dict "Serv" "fluentbit") .) | nindent 8 }}
+
+        volumeMounts:
+          - name: fluentbit-emptydir
+            mountPath: /tmp/
+          - name: fluentbit-config
+            mountPath: /fluent-bit/etc/
+          - name: logs
+            mountPath: /logs
+      dnsPolicy: ClusterFirst
+      schedulerName: default-scheduler
+      
+      restartPolicy: {{ .Values.restartPolicy }}
+      serviceAccountName: {{ index .Values $serv "serviceAccountName" }}
+      volumes:
+      - name: fluentbit-config
+        configMap:
+          name: fluentbit-gateway
+          defaultMode: 256
+      - name: fluentbit-emptydir
+        emptyDir: {} 
+      - emptyDir: {}
+        name: logs
+      - name: istiod-ca-cert
+        configMap:
+          name: istio-ca-root-cert
+          defaultMode: 256
+      - name: podinfo
+        downwardAPI:
+          items:
+            - path: labels
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.labels
+            - path: annotations
+              fieldRef:
+                apiVersion: v1
+                fieldPath: metadata.annotations
+          defaultMode: 256
+      - name: istio-envoy
+        emptyDir: {}
+      - name: istio-data
+        emptyDir: {}
+      - name: istio-token
+        projected:
+          sources:
+            - serviceAccountToken:
+                audience: istio-ca
+                expirationSeconds: 3600
+                path: istio-token
+          defaultMode: 256
+      - name: socket
+        emptyDir: {}

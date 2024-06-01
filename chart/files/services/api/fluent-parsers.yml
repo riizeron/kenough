@@ -1,0 +1,32 @@
+[PARSER]
+    Name   orch-api-requests
+    Format regex
+    Regex  ^\[(?<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}.\d{3})] (?<level>[A-Z]{4,7}) - (?<module>[a-z._-]+):(?<host>\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3}):\d* - "(?<method>[A-Z]{3,4}) (?<handle>[0-9a-z\/]*) .*" (?<code>[0-9]{3})
+    Time_Key time
+    Time_Format %Y-%m-%d %H:%M:%S,%L
+    Time_Keep   On
+
+[PARSER]
+    Name   orch-api-message
+    Format regex
+    Regex  ^\[(?<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}.\d{3})] (?<level>[A-Z]{4,7}) - (?<module>[a-z._-]+):(?<message>.+)$
+    Time_Key time
+    Time_Format %Y-%m-%d %H:%M:%S,%L
+    Time_Keep   On
+
+[PARSER]
+    Name   orch-api-task_status
+    Format regex
+    Regex  ^\[(?<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}.\d{3})] (?<level>[A-Z]{4,7}) - (?<module>[a-z._-]+):Task <(?<task_id>[a-z0-9-]{36})> \| (?<message>.+)$
+    Time_Key time
+    Time_Format %Y-%m-%d %H:%M:%S,%L
+    Time_Keep   On
+
+    
+[MULTILINE_PARSER]
+    Name          python-multiline-regex
+    Type          regex
+    flush_timeout 1000
+    rule "start_state" "^Stack \(most recent call last\):$" "cont"
+    rule "cont" "^[\t ]+.*" "cont"
+    rule "cont" "^(?:[^\s.():]+\.)*[^\s.():]+:" "cont"

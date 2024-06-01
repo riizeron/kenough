@@ -1,0 +1,17 @@
+[PARSER]
+    Name   scan-message
+    Format regex
+    Regex  ^\[(?<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}.\d{3})] (?<level>[A-Z]{4,7}) - (?<module>[a-z._-]+):(?<message>.+)$
+    Time_Key time
+    Time_Format %Y-%m-%d %H:%M:%S,%L
+    Time_Keep   On
+
+
+    
+[MULTILINE_PARSER]
+    Name          python-multiline-regex
+    Type          regex
+    flush_timeout 1000
+    rule "start_state" "^Stack \(most recent call last\):$" "cont"
+    rule "cont" "^[\t ]+.*" "cont"
+    rule "cont" "^(?:[^\s.():]+\.)*[^\s.():]+:" "cont"

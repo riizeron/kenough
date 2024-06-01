@@ -1,0 +1,96 @@
+{{- $namespace := .Values.namespace }}
+{{ if eq .Release.Namespace $namespace }}
+
+{{- $serv := "api" -}}
+{{- $istiocomp := "ingressgateway" -}}
+
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: ratelimit-{{ $serv }}
+  namespace: {{ $namespace }}
+spec:
+  configPatches:
+    - applyTo: HTTP_FILTER
+      match:
+        context: SIDECAR_INBOUND
+        listener:
+          filterChain:
+            filter:
+              name: envoy.filters.network.http_connection_manager
+      patch:
+        operation: INSERT_BEFORE
+        value:
+          name: envoy.filters.http.local_ratelimit
+          typed_config:
+            '@type': type.googleapis.com/udpa.type.v1.TypedStruct
+            type_url: >-
+              type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+            value:
+              stat_prefix: http_local_rate_limiter
+    - applyTo: HTTP_ROUTE
+      match:
+        context: SIDECAR_INBOUND
+        routeConfiguration:
+          vhost:
+            name: inbound|http|{{ index .Values $serv "port" }}
+            route:
+              action: ANY
+      patch:
+        operation: MERGE
+        value:
+          route:
+            rate_limits:
+              - actions:
+                  - remote_address: {}
+              {{- range $_, $route := index .Values $serv "routes" }}
+              - actions:
+                  - header_value_match:
+                      descriptor_value: {{ $route.name }}
+                      expect_match: true
+                      headers:
+                        - name: ':path'
+                          string_match:
+                            ignore_case: true
+                            prefix: {{ $route.prefix }}
+              {{- end }}
+          typed_per_filter_config:
+            envoy.filters.http.local_ratelimit:
+              '@type': >-
+                type.googleapis.com/envoy.extensions.filters.http.local_ratelimit.v3.LocalRateLimit
+              descriptors:
+                {{- range $_, $route := index .Values $serv "routes" }}
+                - entries:
+                    - key: header_match
+                      value: {{ $route.name }}
+                  token_bucket:
+                    fill_interval: 60s
+                    max_tokens: {{ $route.req_per_minute }}
+                    tokens_per_fill: {{ $route.req_per_minute }}
+                {{- end }}
+              filter_enabled:
+                default_value:
+                  denominator: HUNDRED
+                  numerator: 100
+                runtime_key: test_enabled
+              filter_enforced:
+                default_value:
+                  denominator: HUNDRED
+                  numerator: 100
+                runtime_key: test_enabled
+              response_headers_to_add:
+                - append: false
+                  header:
+                    key: x-local-rate-limit
+                    value: 'true'
+              stat_prefix: test_enabled
+              token_bucket:
+                fill_interval: 60s
+                max_tokens: {{ index .Values $serv "req_per_minute" }}
+                tokens_per_fill: 1000
+  workloadSelector:
+    labels:
+      name: orch-{{ $serv }}
+
+
+{{- end }}

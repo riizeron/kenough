@@ -1,0 +1,98 @@
+namespace: ci05083258-epromgen1dbz-orch-engine-sk
+job_namespace: ci05083258-epromgen1dbz-orch-scan-sk
+
+prodRegistry: registry.sigma.sbrf.ru/ci05083258/ci05083258
+
+engineSA: default
+
+role_create: false
+
+control_panel: ci00897349-epromgen1dbz-control-plane-sw-prom-sc
+ingress_host: apps.prom-gen1-dbz.sigma.sbrf.ru
+istioImage: registry.redhat.io/openshift-service-mesh/proxyv2-rhel8@sha256:03ba7a4bed6122c842ac0aeca626be7e6f3ec2106acee2ffda017c8cbf36e41b
+
+resource_ratio: 1
+
+vault:
+  namespace: CI02641928_CI05121460
+  secret_path: A/ORCH/OSH/ALL/KV
+
+bb:
+  hosts:
+    - name: stash.sigma.sbrf.ru
+        ip: 
+          - '10.46.235.120'
+          - '10.46.225.110'
+        port: 20991
+        httpPort: 30991
+        extport: 7999
+      - name: stash.delta.sbrf.ru
+        ip: 
+          - '10.58.131.8'
+          - '10.50.116.27'
+        port: 20992
+        httpPort: 30992
+        extport: 7999
+      - name: sbrf-bitbucket.sigma.sbrf.ru
+        ip: 
+          - '10.18.157.23'
+          - '10.41.209.22'
+          - '10.41.217.50'
+        port: 20993
+        httpPort: 30993
+        extport: 7999
+
+
+secman:
+  hosts: 
+  - name: p.secrets.sigma.sbrf.ru
+    ip: 
+      - '10.60.37.25'
+    port: 8550
+
+k8sapi:
+  hosts: 
+  - name: kubernetes.default.svc
+    ip: 
+      - '29.66.0.1'
+    port: 10000
+
+
+prometheus:
+  csmon:
+    host: tvlds-csmon0015.delta.sbrf.ru
+    sni: tvlds-csmon0015.delta.sbrf.ru
+    hosts:
+    - name: tvlds-csmon0015.delta.sbrf.ru
+      port: 1994 
+  federate: 
+    ip: 29.66.199.94
+  remote_write:
+    url: http://tvlds-csmon0015.delta.sbrf.ru
+    port: 8428
+
+sberworks:
+  port: 9093
+  hosts:
+    - name: pvlss-lasw00001.sigma.sbrf.ru
+      ip: 
+        - '10.54.232.117'
+      port: 7779
+    - name: pvlss-lasw00002.sigma.sbrf.ru
+      ip: 
+        - '10.54.232.174'
+      port: 7778
+    - name: pvlss-lasw00003.sigma.sbrf.ru
+      ip: 
+        - '10.54.232.114'
+      port: 7777
+    - name: pvlss-lasw00004.sigma.sbrf.ru
+      ip: 
+        - '10.54.232.239'
+      port: 7776
+    - name: pvlss-lasw00005.sigma.sbrf.ru
+      ip: 
+        - '10.54.232.165'
+      port: 7775
+  fqdn: esb.devopsaudit.sigma.sbrf.ru
+  postfix: prom 

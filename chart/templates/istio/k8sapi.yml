@@ -1,0 +1,145 @@
+
+{{- $namespace := .Release.Namespace }}
+
+
+{{- $serv := "k8sapi" -}}
+{{- $istiocomp := "egressgateway" -}}
+
+
+--- 
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: {{ $serv }}
+  namespace: {{ $namespace }}
+spec:
+  selector:
+    istio: {{ $istiocomp }}-{{ $namespace }}
+  servers:
+{{- range $_, $host := index .Values $serv "hosts" }}
+  - hosts:
+    - {{ $host.name }}
+    port:
+      name: {{ lower (index $.Values $serv "protocol") }}-{{ $host.port }}
+      number: {{ $host.port }}
+      protocol: {{ index $.Values $serv "protocol" }}
+    tls:
+      mode: PASSTHROUGH
+{{- end }}
+
+
+{{- range $key, $host := index .Values $serv "hosts" }}
+{{- $name := (split "." $host.name)._0 }}
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
+metadata:   
+  name: {{ $serv }}-{{ $name }}
+  namespace: {{ $namespace }}
+spec:
+  addresses: 
+  {{- range $_, $ip := $host.ip }}
+    - {{ $ip }}
+  {{- end }}
+  endpoints:
+  {{- range $_, $ip := $host.ip }}
+    - address: {{ $ip }}
+  {{- end }}
+  exportTo:
+    - .
+  hosts:
+    - {{ $host.name }}
+  location: MESH_EXTERNAL
+  ports:
+    - name: tcp-{{ index $.Values $serv "port" }}
+      number: {{ index $.Values $serv "port" }}
+      protocol: TCP
+  resolution: {{ index $.Values $serv "resolution" }}
+{{ end }}
+
+
+
+{{- range $key, $host := index .Values $serv "hosts" }}
+{{- $name := (split "." $host.name)._0 }}
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ $serv }}-{{ $name }}
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+  - .
+  gateways:
+  - {{ $serv }}
+  - mesh
+  hosts:
+  - {{ $host.name }}
+  tls:
+  - match:  
+    - destinationSubnets:
+      {{- range $_, $ip := $host.ip }}
+      - {{ $ip }}/32
+      {{- end }}
+      gateways:
+      - mesh
+      port: {{ index $.Values $serv "port" }}
+      sniHosts: 
+        - {{ $host.name }}
+    route:
+    - destination:
+        host: {{ $istiocomp }}-svc
+        port:
+          number: {{ $host.port }}
+  - match:
+    - destinationSubnets:
+      {{- range $_, $ip := $host.ip }}
+        - {{ $ip }}/32
+      {{- end }}
+      gateways:
+      - {{ $serv }}
+      port: {{ $host.port }}
+      sniHosts: 
+        - {{ $host.name }}
+    route:
+    - destination:
+        host: {{ $host.name }}
+        port:
+          number: {{ index $.Values $serv "port" }}
+{{ end }}
+
+{{- range $key, $host := index .Values $serv "hosts" }}
+{{- $name := (split "." $host.name)._0 }}
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata: 
+  name: {{ $serv }}-{{ $name }}
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+  - .
+  host: {{ $host.name }}
+  trafficPolicy:
+    loadBalancer:
+      simple: ROUND_ROBIN
+    portLevelSettings:
+      - port:
+          number: {{ $host.port }}
+        tls:
+          caCertificates: {{ $.Values.vault.mount_path }}/ca_chain
+          clientCertificate: {{ $.Values.vault.mount_path }}/certificate
+          mode: MUTUAL
+          privateKey: {{ $.Values.vault.mount_path }}/private_key
+      - port:
+          number: {{ $host.port }}
+        tls:
+          mode: DISABLE
+  workloadSelector:
+    matchLabels:
+      istio: {{ $istiocomp }}-{{ $namespace }} 
+        
+{{ end }}

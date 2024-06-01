@@ -1,0 +1,17 @@
+{{- $namespace := .Values.namespace -}}
+{{ if eq .Release.Namespace $namespace }}
+
+{{- $serv := "fluentbit" -}}
+kind: ConfigMap
+apiVersion: v1
+metadata:
+  name: fluentbit-orch-api
+  namespace: {{ $namespace }}
+data:
+  fluent-bit.conf: |-
+    {{ (tpl (.Files.Get "files/services/api/fluent-config.yml") . ) | nindent 4 }}
+
+  parsers.conf: |-
+    {{ (tpl (.Files.Get "files/services/api/fluent-parsers.yml") . ) | nindent 4 }}
+    
+{{- end }}

@@ -1,0 +1,35 @@
+{{- $serv := "api" }}
+
+front_config_path: 'info.json'
+
+app:
+  port: {{ .Values.api.port }}
+
+logpath: {{ .Values.logs }}
+
+secrets:
+  {{- range $_, $serv_secret := index .Values $serv "secrets" }}
+  {{- $secret := index $.Values.vault.secrets $serv_secret }}
+  {{ $serv_secret }}:
+  {{- range $_, $key := $secret.keys }}
+    {{ $key }}: {{ $.Values.vault.mount_path }}/{{ $serv_secret }}-{{ $key }}
+  {{- end }}
+  {{- end }}
+
+
+sbom_generator:
+  host: http://{{ (index .Values.sbomgen.hosts 0).name }}
+  cn: {{ index .Values "sbom-receiver" "user" }}
+  routes: {{ index .Values "sbom-receiver" "routes" | toYaml | nindent 4}}
+
+db:
+  host: {{ (index .Values.postgres.hosts 0).name }}
+  port: {{ .Values.postgres.asyncport }}
+  names: 
+    orch: {{ index .Values.postgres.db.names "main" }}
+
+
+repo_analyzer:
+  insecure_channel: "{{ index .Values "repo-analyzer" "name" }}-s:{{ index .Values "repo-analyzer" "port" }}"
+distrib_analyzer:
+  insecure_channel: "{{ index .Values "distrib-analyzer" "name" }}-s:{{ index .Values "distrib-analyzer" "port" }}"

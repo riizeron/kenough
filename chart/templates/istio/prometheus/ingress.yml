@@ -1,0 +1,94 @@
+{{- $namespace := .Release.Namespace }}
+{{- $project := "engine" }}
+{{- $serv := "prometheus" -}}
+{{- $istiocomp := "ingressgateway" -}}
+
+{{- $project := "none" }}
+
+{{- if eq $namespace .Values.namespace }}
+{{- $project = "engine" }}
+{{- else if eq $namespace .Values.job_namespace }}
+{{- $project = "scan" }}
+{{- else }}
+{{ fail (print "Incorrect namespace: " $namespace) }}
+{{- end }}
+
+---
+# Source: suppd-backend/templates/gw/prometheus-ingress-gw.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: {{ $serv }}-gw
+  namespace: {{ $namespace }}
+spec:
+  selector:
+    istio: {{ $istiocomp }}-{{ $namespace }}
+  servers:
+    - hosts:
+        - prometheus.{{ $project }}.{{ .Values.ingress_host }}
+      port:
+        name: {{ lower (index .Values $serv "extprotocol") }}-{{ index .Values $serv "extport" }}
+        number: {{ index .Values $serv "extport" }}
+        protocol: {{ index .Values $serv "extprotocol" }}
+      tls:
+        caCertificates: {{ $.Values.vault.mount_path }}/ca_chain
+        serverCertificate: {{ $.Values.vault.mount_path }}/certificate
+        mode: MUTUAL
+        privateKey: {{ $.Values.vault.mount_path }}/private_key
+
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: prometheus-vs
+  namespace: {{ $namespace }}
+spec:
+  exportTo:
+    - .
+  gateways:
+    - prometheus-gw
+  hosts:
+    - prometheus.{{ $project }}.{{ .Values.ingress_host }}
+  http:
+    - match:
+        - uri:
+            prefix: /federate
+      name: federate
+      route:
+        - destination:
+            host: prometheus-{{ $namespace }}
+            port:
+              number: 9090
+    - match:
+        - uri:
+            prefix: /
+      name: root
+      route:
+        - destination:
+            host: prometheus-{{ $namespace }}
+            port:
+              number: 9090
+
+---
+# Source: suppd-backend/templates/routes/promeyheus-rt.yml
+# kind: Route
+# apiVersion: route.openshift.io/v1
+# metadata:
+#   name: prometheus-rt
+#   namespace: {{ $namespace }}
+#   annotations:
+#     haproxy.router.openshift.io/balance: roundrobin
+#     haproxy.router.openshift.io/disable_cookies: 'true'  
+# spec:
+#   host: prometheus.{{ $project }}.{{ .Values.ingress_host }}
+#   to:
+#     kind: Service
+#     name: ingressgateway-svc
+#     weight: 100
+#   port:
+#     targetPort: {{ lower (index .Values $serv "extprotocol") }}-{{ index .Values $serv "extport" }}
+#   tls:
+#     termination: passthrough
+#     insecureEdgeTerminationPolicy: Redirect
+#   wildcardPolicy: None
+
