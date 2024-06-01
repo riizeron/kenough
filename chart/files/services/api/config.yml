@@ -2,6 +2,22 @@
 
 front_config_path: 'info.json'
 
+{{- define "helm-toolkit.utils.joinListWithComma" -}}
+{{- $kafka := . }}
+{{- $port := $kafka.port }}
+{{- $local := dict "first" true -}}
+{{- range $_, $host := $kafka.hosts -}}{{- range $_, $ip := $host.ip -}}{{- if not $local.first -}},{{- end -}}{{- $ip -}}:{{- $port -}}{{- $_ := set $local "first" false -}}{{- end -}}{{- end -}}
+{{- end -}}
+
+kafka:
+  producer:
+    bootstrap_servers: '{{ include "helm-toolkit.utils.joinListWithComma" .Values.kafka }}'
+    client_id: 'localhost.localdomain'
+    retries: 1
+    topics:
+      launch_task: launch_task{{ eq .Values.kafka.postfix "" | ternary "" (print "_" .Values.kafka.postfix) }}
+      ruin_scan: scan_report{{ eq .Values.kafka.postfix "" | ternary "" (print "_" .Values.kafka.postfix) }}
+
 app:
   port: {{ .Values.api.port }}
 

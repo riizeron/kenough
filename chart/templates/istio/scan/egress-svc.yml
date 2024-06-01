@@ -12,6 +12,12 @@ metadata:
   namespace: {{ $namespace }}
 spec:
   ports:
+{{- $protocol:=(.Values.kafka.protocol) }}
+{{- range $_, $host := .Values.kafka.hosts }}
+  - name: {{ lower $protocol }}-{{ $host.port }}
+    port: {{ $host.port }}
+    protocol:  TCP
+{{- end }}
 {{- $protocol:=(.Values.bb.protocol) }}
 {{- range $_, $host := .Values.bb.hosts }}
   - name: {{ lower $protocol }}-{{ $host.port }}

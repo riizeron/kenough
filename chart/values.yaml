@@ -372,6 +372,21 @@ secman:
   resolution: DNS
 
 
+kafka:
+  port: 9093
+  hosts:
+    - name: tkldq-orch00006.delta.sbrf.ru
+      ip: 
+        - '10.55.83.72'
+      port: 2093
+    - name: tkldq-orch00005.delta.sbrf.ru
+      ip: 
+        - '10.55.83.76'
+      port: 2193
+  protocol: TCP
+  resolution: DNS
+  tlsMode: MUTUAL
+  postfix: dev2
 
 
 # ARTIFACT SERVICES
